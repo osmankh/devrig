@@ -1,1 +1,8 @@
 .idea
+node_modules/
+dist/
+out/
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local

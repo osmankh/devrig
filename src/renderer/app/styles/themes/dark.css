@@ -1,0 +1,16 @@
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg-primary: oklch(0.145 0 0);
+  --color-bg-secondary: oklch(0.178 0 0);
+  --color-bg-tertiary: oklch(0.211 0 0);
+  --color-bg-elevated: oklch(0.195 0 0);
+  --color-bg-hover: oklch(0.227 0 0);
+  --color-bg-active: oklch(0.26 0 0);
+  --color-text-primary: oklch(0.985 0 0);
+  --color-text-secondary: oklch(0.708 0 0);
+  --color-text-tertiary: oklch(0.556 0 0);
+  --color-text-disabled: oklch(0.4 0 0);
+  --color-border-default: oklch(0.267 0 0);
+  --color-border-subtle: oklch(0.211 0 0);
+}

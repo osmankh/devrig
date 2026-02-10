@@ -1,0 +1,108 @@
+@theme {
+  /* Background Colors */
+  --color-bg-primary: oklch(0.145 0 0);
+  --color-bg-secondary: oklch(0.178 0 0);
+  --color-bg-tertiary: oklch(0.211 0 0);
+  --color-bg-elevated: oklch(0.195 0 0);
+  --color-bg-hover: oklch(0.227 0 0);
+  --color-bg-active: oklch(0.26 0 0);
+
+  /* Text Colors */
+  --color-text-primary: oklch(0.985 0 0);
+  --color-text-secondary: oklch(0.708 0 0);
+  --color-text-tertiary: oklch(0.556 0 0);
+  --color-text-disabled: oklch(0.4 0 0);
+
+  /* Border Colors */
+  --color-border-default: oklch(0.267 0 0);
+  --color-border-subtle: oklch(0.211 0 0);
+  --color-border-focus: oklch(0.623 0.214 259);
+
+  /* Accent Colors */
+  --color-accent-primary: oklch(0.623 0.214 259);
+  --color-accent-hover: oklch(0.673 0.214 259);
+  --color-accent-muted: oklch(0.623 0.214 259 / 0.15);
+
+  /* Status Colors */
+  --color-status-success: oklch(0.648 0.15 160);
+  --color-status-warning: oklch(0.75 0.15 80);
+  --color-status-error: oklch(0.637 0.237 25);
+  --color-status-info: oklch(0.623 0.214 259);
+
+  /* Node Type Colors */
+  --color-node-trigger: oklch(0.75 0.15 80);
+  --color-node-action: oklch(0.623 0.214 259);
+  --color-node-condition: oklch(0.7 0.15 310);
+  --color-node-ai: oklch(0.648 0.15 160);
+  --color-node-loop: oklch(0.65 0.15 45);
+
+  /* Typography */
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  --text-xs: 0.6875rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  /* Spacing */
+  --spacing-0: 0px;
+  --spacing-0_5: 2px;
+  --spacing-1: 4px;
+  --spacing-1_5: 6px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / 0.3);
+  --shadow-xl: 0 20px 25px -5px oklch(0 0 0 / 0.3);
+
+  /* Z-Index */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-popover: 500;
+  --z-toast: 600;
+  --z-command: 700;
+  --z-tooltip: 800;
+
+  /* Layout */
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 48px;
+  --min-panel-width: 280px;
+  --toolbar-height: 40px;
+  --titlebar-height: 38px;
+
+  /* Animation */
+  --duration-instant: 0ms;
+  --duration-fast: 100ms;
+  --duration-normal: 150ms;
+  --duration-moderate: 200ms;
+  --duration-slow: 300ms;
+
+  --ease-default: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
