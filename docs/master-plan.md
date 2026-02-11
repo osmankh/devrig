@@ -1,15 +1,21 @@
 # DevRig: Master Implementation Plan
 
-**Version**: 1.0 | **Date**: 2026-02-10
-**Status**: Ready for Implementation
+**Version**: 2.0 | **Date**: 2026-02-11
+**Status**: Revised — Developer Command Center Direction
 
 ---
 
 ## Executive Summary
 
-DevRig is a commercial Electron desktop application for AI-native developer workflow automation. It combines a visual flow builder, AI coding agents (Claude Code), and a plugin ecosystem in a desktop-native experience targeting $1M ARR within 12 months.
+DevRig is a commercial Electron desktop application that serves as an **AI-powered developer command center**. It unifies all the tools a developer interacts with daily — email, project management, code review, monitoring, and more — into a single, intelligent hub powered by AI.
 
-This document synthesizes 5 architecture research documents into a single actionable build plan.
+**Core Thesis**: Developers context-switch between 8-12 tools daily (Gmail, Linear, Jira, GitHub, Slack, Datadog, Sentry, etc.). No tool unifies them with AI intelligence. DevRig is the single pane of glass where AI classifies, prioritizes, and acts on information from all your tools — so you see only what matters, with drafts and plans ready to go.
+
+**Architecture**: Plugin-first. Every integration (Gmail, GitHub, Linear, Datadog) is a plugin. The app without plugins is a shell with an AI brain. AI providers (Claude first, then OpenAI, Gemini, local models) are also plugins. A visual flow builder enables custom cross-plugin automations for power users.
+
+**Primary UI**: A unified inbox/dashboard showing priority-sorted items from all connected plugins — emails classified by importance, sprint tickets pre-planned, PRs ready for review, alerts analyzed. Think Linear's inbox meets Superhuman, but for everything.
+
+**Target**: $1M ARR within 12 months via freemium model ($19/mo Pro, $39/user/mo Team).
 
 ---
 
@@ -19,9 +25,9 @@ This document synthesizes 5 architecture research documents into a single action
 
 | Layer | Technology | Version | Rationale |
 |-------|-----------|---------|-----------|
-| **Desktop Runtime** | Electron | 34+ | User's explicit choice; ecosystem advantage; Chromium 132+, Node.js 22+ |
-| **Build Tool** | electron-vite | 5.0 | Purpose-built for Electron; V8 bytecode compilation; HMR |
-| **Packaging** | Electron Forge | 7.7+ | .dmg, .exe, .AppImage output; code signing integration |
+| **Desktop Runtime** | Electron | 34+ | Chromium 132+, Node.js 22+; Cursor/VSCode precedent |
+| **Build Tool** | electron-vite | 5.0 | Purpose-built for Electron; V8 bytecode; HMR |
+| **Packaging** | Electron Forge | 7.7+ | .dmg, .exe, .AppImage; code signing integration |
 | **Language** | TypeScript | 5.7+ | Strict mode across all processes |
 
 ### Frontend (Renderer Process)
@@ -33,7 +39,7 @@ This document synthesizes 5 architecture research documents into a single action
 | **State Management** | Zustand + Immer + Zundo | 5.0+ | Centralized stores; immutable updates; undo/redo |
 | **Design System** | shadcn/ui + Radix UI | 1.2+ | Copy-to-project; full ownership; accessibility |
 | **CSS** | Tailwind CSS v4 | 4.1+ | @theme directive; CSS-first design tokens |
-| **Animations** | Motion (Framer Motion successor) | 12.4+ | WAAPI hybrid engine; spring physics |
+| **Animations** | Motion | 12.4+ | WAAPI hybrid engine; spring physics |
 | **Command Palette** | cmdk | 1.1+ | Same as Linear/Raycast; under 5KB |
 | **Virtual Scrolling** | TanStack Virtual | 3.13+ | 60fps with 10K+ items |
 | **Fonts** | Inter Variable + JetBrains Mono | Latest | Linear-style typography |
@@ -47,7 +53,7 @@ This document synthesizes 5 architecture research documents into a single action
 | **Plugin Sandbox** | isolated-vm | Latest | V8 isolates; 128MB memory limit; 5s timeout |
 | **Job Queue** | SQLite-backed custom | N/A | No Redis dependency; atomic dequeue |
 | **Logging** | Pino | 9+ | Structured JSON logging |
-| **AI Integration** | Claude API + Agent SDK | Latest | First-class AI workflow actions |
+| **AI Integration** | Claude API + Agent SDK | Latest | First-class AI provider; multi-model abstraction |
 | **Native Addons** | NAPI-RS (Rust) | 2+ | 10x perf for CPU-intensive ops |
 
 ### Security & Distribution
@@ -74,36 +80,83 @@ This document synthesizes 5 architecture research documents into a single action
 |  RENDERER PROCESS (Chromium Sandbox)                              |
 |                                                                    |
 |  React 19 + React Compiler                                        |
+|  ├── Unified Inbox (primary UI — priority-sorted feed)            |
+|  ├── Plugin View Registry (plugins register custom views)         |
+|  ├── Flow Builder (@xyflow/react — power user automations)        |
 |  ├── Feature-Sliced Design (6 layers)                             |
 |  ├── Zustand stores (in-memory state, Tier 1)                     |
-|  ├── @xyflow/react (visual flow builder)                          |
 |  ├── shadcn/ui + Tailwind v4 (design system)                     |
 |  ├── cmdk (command palette)                                       |
-|  ├── Motion (animations)                                          |
-|  └── TanStack Virtual (scrolling)                                 |
+|  └── Motion (animations)                                          |
 |                                                                    |
 +------------------------------|-------------------------------------+
                                | IPC (invoke/handle, channel whitelist)
 +------------------------------|-------------------------------------+
-|  MAIN PROCESS (Node.js - Lightweight Coordinator)                 |
+|  MAIN PROCESS (Node.js - Coordinator)                             |
 |                                                                    |
-|  ├── Window management & app lifecycle                            |
+|  ├── Plugin Manager (lifecycle, permissions, registry)            |
+|  ├── AI Provider Layer (Claude → OpenAI → Gemini → local)         |
+|  ├── AI Pipeline Engine (classify, summarize, draft, plan)        |
+|  ├── Plugin Data Sync Scheduler (polling, webhooks)               |
 |  ├── IPC router (validates sender, routes to workers)             |
-|  ├── Auto-updater                                                 |
-|  ├── System tray                                                  |
-|  └── License validation                                           |
+|  ├── Window management & app lifecycle                            |
+|  ├── Auto-updater & license validation                            |
+|  └── System tray                                                  |
 |                                                                    |
 +----------|----------------|----------------|----------------------+
            |                |                |
     +------v------+  +------v------+  +------v------+
-    | UtilityProc |  | Hidden      |  | Worker      |
-    | (Database)  |  | Window      |  | Threads     |
-    |             |  | (Automation)|  | (CPU tasks) |
+    | Database    |  | Hidden      |  | Worker      |
+    | (Main Proc) |  | Window      |  | Threads     |
+    |             |  | (Execution) |  | (CPU tasks) |
     | SQLite WAL  |  | Workflow    |  | Sync engine |
     | better-     |  | execution   |  | Data xform  |
     | sqlite3     |  | Plugin      |  | Search      |
     | Drizzle ORM |  | sandbox     |  | indexing    |
     +-------------+  +-------------+  +-------------+
+```
+
+### Plugin-First Architecture
+
+Everything is a plugin. The core app provides:
+1. **Plugin runtime** — lifecycle, sandbox, permissions, IPC bridge
+2. **AI provider abstraction** — multi-model routing, cost tracking
+3. **Unified inbox** — renders items from all plugins in a priority-sorted feed
+4. **Flow builder** — visual automation canvas for cross-plugin workflows
+5. **Data layer** — SQLite storage, sync scheduling, secrets management
+
+Plugins provide:
+1. **Data sources** — fetch emails, tickets, PRs, alerts from external services
+2. **AI pipelines** — classification rules, prompt templates, drafting logic
+3. **Actions** — reply to email, assign ticket, approve PR, acknowledge alert
+4. **Views** — custom UI panels registered in the dashboard
+5. **Flow nodes** — custom trigger/action/condition nodes for the flow builder
+
+### AI Provider Abstraction
+
+```
+┌─────────────────────────────────────────────┐
+│  AI Provider Interface                       │
+│  ├── complete(prompt, options) → response    │
+│  ├── stream(prompt, options) → stream        │
+│  ├── classify(items, schema) → labels        │
+│  ├── summarize(content) → summary            │
+│  └── draft(context, intent) → text           │
+├─────────────────────────────────────────────┤
+│  Providers (plugins):                        │
+│  ├── Claude (default, first-class)           │
+│  ├── OpenAI (GPT-4o, o3)                    │
+│  ├── Google Gemini                           │
+│  ├── Local (Ollama, LM Studio)              │
+│  └── Custom endpoint                         │
+├─────────────────────────────────────────────┤
+│  Model Router:                               │
+│  ├── Per-task model selection                │
+│  ├── Cost tracking per operation             │
+│  ├── Rate limiting & quota management        │
+│  ├── Fallback chain (Claude → OpenAI → local)│
+│  └── User-provided API keys support          │
+└─────────────────────────────────────────────┘
 ```
 
 ### Data Architecture (3-Tier, Linear-Inspired)
@@ -131,273 +184,436 @@ Tier 3: Cloud Sync (Future)    - WebSocket deltas, LWW conflict resolution
 
 ## 3. Phased Implementation Plan
 
-### Phase 1: Foundation (Weeks 1-3)
+### Phase 1: Foundation (Weeks 1-3) ✅ COMPLETE
 
 **Goal**: Bootable Electron app with project scaffolding, design system, and database layer.
 
-#### Week 1: Project Scaffold & Electron Shell
-
-| Task | Description | Files |
-|------|-------------|-------|
-| **1.1** Initialize monorepo | `package.json`, `tsconfig.json` (main, preload, renderer), `electron.vite.config.ts`, `forge.config.ts` | Root config files |
-| **1.2** Electron main process | Window creation with security defaults (`nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`), CSP headers, navigation guards, permission denials | `src/main/index.ts`, `src/main/csp.ts`, `src/main/navigation-guard.ts`, `src/main/permissions.ts` |
-| **1.3** Preload script | contextBridge with channel whitelist, typed IPC API | `src/preload/index.ts`, `src/preload/api.ts` |
-| **1.4** Renderer entry | React 19 entry point, providers, Tailwind v4 setup, dark/light theme tokens | `src/renderer/main.tsx`, `src/renderer/app/`, styles |
-| **1.5** State-based router | Zustand-powered view router (not URL-based) with `React.lazy` code splitting | `src/renderer/app/router/` |
-| **1.6** IPC security layer | `secureHandle()` wrapper with sender validation for main process | `src/main/ipc-security.ts` |
-
-**Deliverable**: Electron app launches, shows an empty shell with dark theme, window controls work.
-
-#### Week 2: Database & Design System
-
-| Task | Description | Files |
-|------|-------------|-------|
-| **2.1** SQLite setup | better-sqlite3 connection with WAL mode, performance pragmas (mmap 256MB, cache 64MB, synchronous NORMAL) | `src/main/db/connection.ts` |
-| **2.2** Database schema | Core tables: `workspaces`, `workflows`, `flow_nodes`, `flow_edges`, `executions`, `execution_steps`, `settings` | `src/main/db/migrations/`, `src/main/db/schema.ts` |
-| **2.3** Prepared statement cache | Statement cache class to avoid recompilation | `src/main/db/statement-cache.ts` |
-| **2.4** Repository layer | Data access objects for workflows, nodes, executions | `src/main/db/repositories/` |
-| **2.5** IPC database handlers | `db:getFlow`, `db:saveFlow`, `db:updateNode`, `db:listWorkflows` handlers | `src/main/ipc/db-handlers.ts` |
-| **2.6** Design system setup | Install shadcn/ui, configure Tailwind v4 @theme tokens, Inter + JetBrains Mono fonts, OKLCH color system | `src/renderer/shared/ui/`, `src/renderer/app/styles/tokens.css` |
-| **2.7** Core UI components | Button, Input, Dialog, DropdownMenu, Tooltip, ScrollArea, Badge, Toast (Sonner), Tabs, Separator | `src/renderer/shared/ui/*.tsx` |
-
-**Deliverable**: Database reads/writes work via IPC. Design system components rendered on screen.
-
-#### Week 3: Layout Shell & State Management
-
-| Task | Description | Files |
-|------|-------------|-------|
-| **3.1** App layout | Sidebar + main content + property panel (resizable via shadcn ResizablePanel) | `src/renderer/widgets/` |
-| **3.2** Sidebar component | Workspace navigation, flow list, collapsed/expanded states with Motion animation | `src/renderer/widgets/sidebar/` |
-| **3.3** Zustand stores | `flow-store.ts` (nodes, edges, viewport), `workspace-store.ts` (preferences), `ui-store.ts` (panels, modals) | `src/renderer/entities/*/model/` |
-| **3.4** Immer middleware | Enable immutable updates with mutable syntax across stores | Integrated into stores |
-| **3.5** Zundo undo/redo | Temporal middleware on flow-store, 100-state history, partialized | `src/renderer/features/undo-redo/` |
-| **3.6** Optimistic update pattern | Write-through from Zustand to SQLite with rollback on failure | `src/renderer/shared/lib/optimistic.ts` |
-| **3.7** Tiered data loading | Bootstrap cache (localStorage), partial load (IPC), full load (deferred) | `src/renderer/app/bootstrap.ts`, `src/renderer/app/data-loader.ts` |
-| **3.8** Dashboard page | Flow list with virtual scrolling (TanStack Virtual), recent items, create new flow button | `src/renderer/pages/dashboard/` |
-
-**Deliverable**: Full app shell with sidebar, dashboard, resizable panels, theme switching, data persisted to SQLite.
+**Delivered**:
+- Electron shell with full security hardening (CSP, IPC whitelist, sandbox)
+- SQLite database with WAL mode, 9 tables, repository layer
+- React 19 + Tailwind v4 + shadcn/ui design system (15+ components)
+- Feature-Sliced Design architecture
+- Zustand + Immer + Zundo state management
+- App layout with sidebar, dashboard, state-based router
 
 ---
 
-### Phase 2: Flow Builder (Weeks 4-6)
+### Phase 2: Plugin SDK Core & AI Provider Layer (Weeks 4-6)
 
-**Goal**: Visual workflow editor with custom nodes, drag-and-drop, and basic execution.
+**Goal**: Plugin runtime that can load, sandbox, and manage plugins. AI provider abstraction with Claude as first provider.
 
-#### Week 4: React Flow Canvas
-
-| Task | Description | Files |
-|------|-------------|-------|
-| **4.1** Flow canvas widget | @xyflow/react setup with project defaults, viewport controls, minimap, background grid | `src/renderer/widgets/flow-canvas/` |
-| **4.2** Custom node types | BaseNode, TriggerNode, ActionNode, ConditionNode, AINode, LoopNode, SubflowNode | `src/renderer/entities/node/ui/` |
-| **4.3** Node registry | Maps node type strings to React components | `src/renderer/entities/node/model/node-registry.ts` |
-| **4.4** Node palette | Draggable sidebar with available node types, drag-and-drop onto canvas | `src/renderer/widgets/node-palette/` |
-| **4.5** Edge connections | Custom edge styles, animated data flow indicators, connection validation | `src/renderer/entities/edge/` |
-| **4.6** Flow store integration | React Flow state synced with Zustand flow-store, bidirectional | `src/renderer/entities/flow/model/flow-store.ts` |
-
-#### Week 5: Node Configuration & Execution Engine
+#### Week 4: Plugin Architecture
 
 | Task | Description | Files |
 |------|-------------|-------|
-| **5.1** Property panel | Context-sensitive node configuration editor that appears when a node is selected | `src/renderer/widgets/property-panel/` |
-| **5.2** Node config forms | Per-node-type configuration: trigger (cron/webhook/manual), action (shell/HTTP/file), condition (JSON DSL) | `src/renderer/features/configure-node/` |
-| **5.3** DAG execution engine | Topological sort, step-by-step execution, status tracking per node | `src/main/services/flow-executor.ts` |
-| **5.4** Trigger system | Manual trigger (button click), cron trigger (node-cron), webhook trigger (local HTTP server) | `src/main/services/triggers/` |
-| **5.5** Condition evaluator | JSON-based condition DSL with Zod validation: `{"field": "status", "op": "eq", "value": "done"}` | `src/main/services/condition-engine.ts` |
-| **5.6** Action executors | Shell command, HTTP request, file operations | `src/main/services/actions/` |
+| **4.1** Plugin manifest schema | JSON schema for plugin declarations: id, name, version, permissions, capabilities (dataSources, actions, views, flowNodes, aiPipelines) | `src/main/plugins/manifest-schema.ts` |
+| **4.2** Plugin loader | Discover plugins from plugin directory, validate manifests, register capabilities | `src/main/plugins/plugin-loader.ts` |
+| **4.3** isolated-vm sandbox | V8 isolate per plugin, 128MB memory, 5s timeout, capability-gated host functions | `src/main/plugins/isolate-sandbox.ts` |
+| **4.4** Plugin permission model | Permission types: network (domain allowlist), secrets (read specific keys), filesystem (path restrictions), AI (model access) | `src/main/plugins/permissions.ts` |
+| **4.5** Plugin API surface | Host functions exposed to plugins: `log`, `fetch`, `getSecret`, `storeItems`, `queryItems`, `emitEvent`, `requestAI` | `src/main/plugins/plugin-api.ts` |
+| **4.6** Plugin lifecycle manager | Install, enable, disable, uninstall, update. Plugin state persisted to DB | `src/main/plugins/plugin-manager.ts` |
 
-#### Week 6: Execution UI & Flow Persistence
+#### Week 5: AI Provider Abstraction
 
 | Task | Description | Files |
 |------|-------------|-------|
-| **6.1** Execution panel | Real-time execution timeline showing step status (pending/running/success/error) | `src/renderer/widgets/execution-panel/` |
-| **6.2** Execution store | Zustand store for running executions, logs, step statuses | `src/renderer/entities/execution/` |
-| **6.3** Flow save/load | Serialize flow to SQLite, load on open, auto-save on change (debounced) | IPC handlers + store integration |
-| **6.4** Flow import/export | JSON export/import for flow sharing | `src/renderer/features/import-export/` |
-| **6.5** Node status visualization | Color-coded node borders during execution (green=success, red=error, blue=running, gray=pending) | Node component updates |
-| **6.6** Execution history page | List of past executions with status, duration, re-run capability | `src/renderer/pages/execution-history/` |
+| **5.1** AI provider interface | TypeScript interface: complete(), stream(), classify(), summarize(), draft() | `src/main/ai/provider-interface.ts` |
+| **5.2** Claude provider | First-class Claude API integration with streaming, model selection (Opus/Sonnet/Haiku) | `src/main/ai/providers/claude-provider.ts` |
+| **5.3** Model router | Per-task model selection, fallback chains, cost tracking per operation | `src/main/ai/model-router.ts` |
+| **5.4** AI pipeline engine | Composable pipelines: classify → filter → summarize → draft. Plugins register pipeline definitions | `src/main/ai/pipeline-engine.ts` |
+| **5.5** Cost tracker | Track token usage per provider, per plugin, per pipeline. Enforce tier limits | `src/main/ai/cost-tracker.ts` |
+| **5.6** Secrets management | safeStorage integration for API keys, AES-256-GCM field encryption for plugin credentials | `src/main/secrets/` |
 
-**Deliverable**: Working visual flow builder. Users can create flows with triggers/conditions/actions, execute them, and see results in real-time.
+#### Week 6: Plugin Data Model & IPC
+
+| Task | Description | Files |
+|------|-------------|-------|
+| **6.1** Inbox items table | Unified schema for items from all plugins: id, plugin_id, type, title, body, priority, status, metadata, ai_classification, source_url, created_at | `src/main/db/schema.ts` update |
+| **6.2** Plugin data source contract | Interface for plugins to push items: `storeItems(items[])`, `queryItems(filter)`, `markRead(ids[])`, `archive(ids[])` | Plugin API extension |
+| **6.3** Data sync scheduler | Background scheduler for plugin data fetches. Configurable intervals per plugin. SQLite-backed job queue | `src/main/services/sync-scheduler.ts` |
+| **6.4** Plugin IPC handlers | IPC channels for renderer to interact with plugins: `plugin:list`, `plugin:install`, `plugin:configure`, `plugin:getItems` | `src/main/ipc/plugin-handlers.ts` |
+| **6.5** AI IPC handlers | IPC channels for AI operations: `ai:classify`, `ai:summarize`, `ai:draft`, `ai:complete`, `ai:getProviders`, `ai:getUsage` | `src/main/ipc/ai-handlers.ts` |
+| **6.6** Plugin SDK package | `@devrig/plugin-sdk` npm package with types, helpers, example plugin scaffold | `packages/plugin-sdk/` |
+
+**Deliverable**: Plugin runtime loads and sandboxes plugins. Claude AI provider works. Plugins can fetch data, store items, and request AI operations. SDK published for plugin development.
 
 ---
 
-### Phase 3: AI Integration & Command Palette (Weeks 7-9)
+### Phase 3: Unified Inbox & Dashboard (Weeks 7-9)
 
-**Goal**: Claude Code as a first-class workflow action, command palette, keyboard-first UX.
+**Goal**: The primary UI — a unified inbox showing AI-classified items from all connected plugins, with inline actions.
 
-#### Week 7: AI Integration
-
-| Task | Description | Files |
-|------|-------------|-------|
-| **7.1** AI service layer | Claude API client with streaming, model selection, cost tracking | `src/main/services/ai-service.ts` |
-| **7.2** AI action node | Configurable AI node: prompt template, model selection, context injection, response handling | `src/main/services/actions/ai-action.ts` |
-| **7.3** AI assistant panel | Chat-style AI interaction panel for flow building assistance | `src/renderer/widgets/ai-assistant/` |
-| **7.4** AI flow generation | "Describe your workflow" -> AI generates flow nodes and connections | `src/renderer/features/ai-generate/` |
-| **7.5** AI store | Model configs, conversation history, usage tracking | `src/renderer/entities/ai-model/` |
-| **7.6** MCP protocol integration | Connect to MCP servers for extended AI capabilities (Linear, GitHub) | `src/main/services/mcp-client.ts` |
-
-#### Week 8: Command Palette & Keyboard Navigation
+#### Week 7: Inbox Core
 
 | Task | Description | Files |
 |------|-------------|-------|
-| **8.1** Command palette | cmdk integration with shadcn Command component, Cmd+K activation | `src/renderer/widgets/command-palette/` |
-| **8.2** Command registry | Centralized command definitions with keyboard shortcuts | `src/renderer/widgets/command-palette/model/commands.ts` |
-| **8.3** Keyboard shortcut system | Global shortcut registry, platform-aware modifiers, context-sensitive, customizable | `src/renderer/shared/lib/shortcuts.ts` |
-| **8.4** Shortcut provider | React context for shortcut registration/deregistration | `src/renderer/app/providers/ShortcutProvider.tsx` |
-| **8.5** Canvas shortcuts | A (add node), Space+Drag (pan), Cmd+0 (fit), Delete (remove), Cmd+D (duplicate) | Canvas integration |
-| **8.6** Global shortcuts | Cmd+N (new flow), Cmd+S (save), Cmd+Z/Shift+Z (undo/redo), Cmd+B (sidebar), Cmd+Enter (run) | App-level integration |
+| **7.1** Inbox page | Primary page replacing dashboard. Priority-sorted feed of items from all plugins. Grouped by plugin or time | `src/renderer/pages/inbox/` |
+| **7.2** Inbox store | Zustand store for inbox items, filters, sorting, read/unread state, AI classifications | `src/renderer/entities/inbox-item/model/inbox-store.ts` |
+| **7.3** Inbox item component | Versatile item renderer: shows plugin icon, title, AI summary, priority badge, quick actions. Expandable detail view | `src/renderer/entities/inbox-item/ui/InboxItem.tsx` |
+| **7.4** AI classification display | Show AI-assigned labels (Important, Needs Response, FYI, Spam), confidence scores, reasoning on hover | Integrated into InboxItem |
+| **7.5** Inbox filters | Filter by: plugin, priority, status (unread/read/archived), AI classification, date range | `src/renderer/features/inbox-filter/` |
+| **7.6** Virtual scrolling | TanStack Virtual for inbox list — must handle 1000+ items at 60fps | Inbox page integration |
 
-#### Week 9: Settings & Secrets Management
+#### Week 8: Inline Actions & Plugin Views
 
 | Task | Description | Files |
 |------|-------------|-------|
-| **9.1** Settings page | Tabbed settings: General, AI Models, Integrations, Shortcuts, About | `src/renderer/pages/settings/` |
-| **9.2** Secrets management | safeStorage integration for API keys, keytar fallback, AES-256-GCM field encryption | `src/main/secrets/` |
-| **9.3** API key management UI | Add/remove/test API keys for Claude, GitHub, Linear with secure storage | Settings integration |
-| **9.4** Theme settings | Dark/light/system theme selection, persisted to workspace-store | Settings integration |
-| **9.5** User preferences | Default view, sidebar state, editor preferences, flow auto-save interval | Settings integration |
+| **8.1** Inline action system | Actions registered by plugins, rendered as buttons/menus on inbox items (Reply, Assign, Approve, Acknowledge) | `src/renderer/features/inbox-actions/` |
+| **8.2** Action execution | Execute plugin actions via IPC, show loading/success/error states, optimistic UI updates | Action system integration |
+| **8.3** AI draft panel | When an item needs a response, show AI-generated draft. User can edit, approve, or regenerate | `src/renderer/widgets/ai-draft-panel/` |
+| **8.4** Plugin view registry | Plugins can register custom view components. Views appear as tabs/panels in the dashboard | `src/renderer/app/plugin-views.ts` |
+| **8.5** Detail panel | Right-side panel showing full item detail when selected. Plugin provides the detail view component | `src/renderer/widgets/detail-panel/` |
+| **8.6** Notification system | Background sync produces new items → badge count on tray icon, toast notification for high-priority items | Tray + notification integration |
 
-**Deliverable**: AI-powered flow building. Cmd+K command palette. Keyboard-first UX. Secrets securely stored.
+#### Week 9: Command Palette & Settings
+
+| Task | Description | Files |
+|------|-------------|-------|
+| **9.1** Command palette | cmdk integration with global Cmd+K. Searches across: inbox items, plugins, actions, flows, settings | `src/renderer/widgets/command-palette/` |
+| **9.2** Keyboard shortcut system | Global shortcut registry, platform-aware modifiers, context-sensitive | `src/renderer/shared/lib/shortcuts.ts` |
+| **9.3** Settings page | Tabs: General, AI Models, Plugins, Connections, Keyboard Shortcuts, About | `src/renderer/pages/settings/` |
+| **9.4** Plugin configuration UI | Per-plugin settings: API keys, sync intervals, AI pipeline options, permissions review | Settings integration |
+| **9.5** AI model settings | Configure providers, select default model per task type, view usage/costs, manage API keys | Settings integration |
+| **9.6** Onboarding flow | First-run: welcome → choose plugins → configure API keys → first sync → see inbox populate | `src/renderer/features/onboarding/` |
+
+**Deliverable**: Unified inbox shows items from plugins, AI-classified and priority-sorted. Inline actions work. Command palette for keyboard-first UX. Settings and onboarding complete.
 
 ---
 
-### Phase 4: Integrations & Plugin System (Weeks 10-13)
+### Phase 4: First-Party Plugins (Weeks 10-13)
 
-**Goal**: Linear + GitHub integrations working. Plugin SDK v1.0.
+**Goal**: Ship the first wave of plugins that demonstrate the platform's value. Each plugin follows the plugin SDK contract.
 
-#### Week 10: Linear Integration
-
-| Task | Description | Files |
-|------|-------------|-------|
-| **10.1** Linear API client | OAuth2 flow, issue CRUD, webhook handling, label/status management | `src/main/integrations/linear/` |
-| **10.2** Linear trigger node | Trigger on: issue assigned, status changed, label added, comment added | Integration with trigger system |
-| **10.3** Linear action node | Create issue, update status, add comment, assign user | Integration with action system |
-| **10.4** Linear condition node | Check issue status, priority, labels, assignee | Integration with condition engine |
-| **10.5** OAuth flow UI | In-app OAuth authorization flow for Linear | `src/renderer/features/oauth/` |
-
-#### Week 11: GitHub Integration
+#### Week 10: Gmail Plugin
 
 | Task | Description | Files |
 |------|-------------|-------|
-| **11.1** GitHub API client | OAuth2/PAT, repository access, PR management, issue management | `src/main/integrations/github/` |
-| **11.2** GitHub trigger node | Trigger on: PR opened, push to branch, issue created, review requested | Integration with trigger system |
-| **11.3** GitHub action node | Create PR, merge PR, create issue, add comment, request review | Integration with action system |
-| **11.4** GitHub condition node | Check branch status, review approval, CI status | Integration with condition engine |
+| **10.1** Gmail OAuth2 flow | Google OAuth2 with PKCE, offline refresh tokens, stored via safeStorage | `plugins/gmail/auth.ts` |
+| **10.2** Email data source | Fetch new emails via Gmail API, map to inbox items, incremental sync via history ID | `plugins/gmail/data-source.ts` |
+| **10.3** AI email pipeline | Classify emails (Important/Needs Reply/FYI/Spam), summarize threads, draft replies | `plugins/gmail/ai-pipeline.ts` |
+| **10.4** Email actions | Reply (with AI draft), archive, label, snooze, mark important | `plugins/gmail/actions.ts` |
+| **10.5** Email detail view | Full email thread view with conversation, attachments, AI summary sidebar | `plugins/gmail/views/` |
 
-#### Week 12: Plugin SDK & Sandbox
-
-| Task | Description | Files |
-|------|-------------|-------|
-| **12.1** Plugin manifest schema | JSON schema for plugin declarations: permissions, resources, metadata | `src/main/plugins/manifest-schema.ts` |
-| **12.2** Plugin loader | Discover, validate, and load plugins from plugin directory | `src/main/plugins/plugin-loader.ts` |
-| **12.3** isolated-vm sandbox | V8 isolate per plugin, 128MB memory, 5s timeout, capability-gated host functions | `src/main/plugins/isolate-sandbox.ts` |
-| **12.4** Plugin permission model | Network allowlist, file read/write path restrictions, secret access control | `src/main/plugins/permissions.ts` |
-| **12.5** Plugin API surface | Host functions exposed to plugins: `log`, `fetch`, `readFile`, `getSecret`, `emitEvent` | `src/main/plugins/plugin-api.ts` |
-| **12.6** Plugin SDK package | `@devrig/plugin-sdk` npm package with types, helpers, example plugin | `packages/plugin-sdk/` |
-
-#### Week 13: Plugin Marketplace UI & Template Flows
+#### Week 11: GitHub Plugin
 
 | Task | Description | Files |
 |------|-------------|-------|
-| **13.1** Plugin manager UI | Browse installed plugins, install/remove, permission review, settings | `src/renderer/pages/plugins/` |
-| **13.2** Plugin settings integration | Per-plugin configuration UI generated from manifest | Plugin page integration |
-| **13.3** Flow templates | Pre-built templates: "Linear bug -> Claude Code analysis", "GitHub PR -> AI review", "Cron -> report generation" | `src/main/templates/` |
-| **13.4** Template gallery UI | Browse and one-click install flow templates | `src/renderer/features/templates/` |
+| **11.1** GitHub OAuth/PAT auth | GitHub App or PAT authentication, stored via safeStorage | `plugins/github/auth.ts` |
+| **11.2** GitHub data sources | PRs (assigned, review requested), Issues (assigned, mentioned), CI status, notifications | `plugins/github/data-source.ts` |
+| **11.3** AI code review pipeline | Analyze PR diffs, identify issues, suggest improvements, summarize changes | `plugins/github/ai-pipeline.ts` |
+| **11.4** GitHub actions | Approve PR, request changes, comment, merge, assign, label, close issue | `plugins/github/actions.ts` |
+| **11.5** PR review view | Diff viewer with AI annotations, inline comments, approval controls | `plugins/github/views/` |
 
-**Deliverable**: Linear + GitHub integrations working end-to-end. Plugin SDK published. Template flows available.
+#### Week 12: Linear / Jira / ClickUp Plugin
+
+| Task | Description | Files |
+|------|-------------|-------|
+| **12.1** Linear OAuth2 flow | Linear API authentication + webhook registration | `plugins/linear/auth.ts` |
+| **12.2** Ticket data sources | Assigned tickets in current cycle/sprint, updated issues, comments/mentions | `plugins/linear/data-source.ts` |
+| **12.3** AI sprint planning pipeline | Pull assigned tickets, analyze requirements, break into subtasks, estimate complexity, suggest implementation plan | `plugins/linear/ai-pipeline.ts` |
+| **12.4** Ticket actions | Update status, assign, comment, create sub-issue, change priority, move to cycle | `plugins/linear/actions.ts` |
+| **12.5** Jira adapter | Same plugin contract, Jira REST API backend. Shared UI with Linear plugin | `plugins/jira/` |
+| **12.6** ClickUp adapter | Same plugin contract, ClickUp API backend | `plugins/clickup/` |
+
+#### Week 13: Flow Builder + Cross-Plugin Automations
+
+| Task | Description | Files |
+|------|-------------|-------|
+| **13.1** Flow builder page | Visual flow builder using @xyflow/react (already partially built). Refine for cross-plugin flows | `src/renderer/pages/flow-editor/` (existing, enhanced) |
+| **13.2** Plugin flow nodes | Plugins register custom trigger/action/condition nodes for the flow builder | Plugin SDK extension |
+| **13.3** Cross-plugin triggers | Trigger on: new email matching filter, PR opened, ticket assigned, alert fired | Trigger system integration |
+| **13.4** Cross-plugin actions | Actions from any plugin can be nodes: reply to email, update ticket, comment on PR | Action system integration |
+| **13.5** Flow templates | Pre-built templates: "Email → AI Classify → Draft Reply", "PR Opened → AI Review → Comment", "Ticket Assigned → AI Plan → Create Subtasks" | `src/main/templates/` |
+| **13.6** Execution history | Execution history page for flow runs (existing, enhanced) | `src/renderer/pages/execution-history/` |
+
+**Deliverable**: Gmail, GitHub, and Linear/Jira/ClickUp plugins working end-to-end. Cross-plugin flows enabled. AI classifies, summarizes, and drafts across all integrations.
 
 ---
 
-### Phase 5: Production Hardening (Weeks 14-16)
+### Phase 5: Monitoring Plugins & Multi-Model AI (Weeks 14-16)
+
+**Goal**: Monitoring integrations. Multi-model AI support. Advanced AI capabilities.
+
+#### Week 14: Monitoring Plugins
+
+| Task | Description | Files |
+|------|-------------|-------|
+| **14.1** Sentry plugin | Fetch errors, AI-analyze stack traces, group by root cause, suggest fixes | `plugins/sentry/` |
+| **14.2** Datadog plugin | Fetch alerts/monitors, AI-correlate with recent deployments, suggest remediation | `plugins/datadog/` |
+| **14.3** CloudWatch plugin | Fetch alarms, AI-analyze metrics, correlate with recent changes | `plugins/cloudwatch/` |
+| **14.4** Monitoring dashboard view | Unified monitoring view across all providers: error rates, alert status, AI insights | Plugin view integration |
+
+#### Week 15: Multi-Model AI & Advanced AI
+
+| Task | Description | Files |
+|------|-------------|-------|
+| **15.1** OpenAI provider plugin | GPT-4o, o3 integration via AI provider interface | `plugins/openai-provider/` |
+| **15.2** Google Gemini provider plugin | Gemini Pro/Flash integration | `plugins/gemini-provider/` |
+| **15.3** Local model provider plugin | Ollama, LM Studio integration for offline/free AI | `plugins/local-provider/` |
+| **15.4** AI agent mode | Long-running autonomous workflows: AI plans → executes → reports. Human-in-the-loop approval gates | `src/main/ai/agent-mode.ts` |
+| **15.5** AI context management | Smart context injection: what data gets sent to AI per plugin, truncation strategy, token budget management | `src/main/ai/context-manager.ts` |
+
+#### Week 16: Plugin Marketplace & Ecosystem
+
+| Task | Description | Files |
+|------|-------------|-------|
+| **16.1** Plugin marketplace UI | Browse, search, install plugins. Ratings, download counts, plugin detail pages | `src/renderer/pages/plugin-marketplace/` |
+| **16.2** Plugin publishing flow | `devrig publish` CLI command, manifest validation, plugin registry API | `packages/plugin-cli/` |
+| **16.3** Community plugin support | Documentation site, plugin development guide, example plugins | External docs |
+| **16.4** Plugin revenue sharing | 70/30 split for premium plugins. Stripe integration for payouts | Marketplace backend |
+
+**Deliverable**: Monitoring plugins provide error/alert visibility. Multiple AI models supported. Plugin marketplace enables community growth.
+
+---
+
+### Phase 6: Production Hardening (Weeks 17-19)
 
 **Goal**: Code signing, licensing, auto-update, performance optimization, crash reporting.
 
-#### Week 14: Code Signing & Distribution
+#### Week 17: Code Signing & Distribution
 
 | Task | Description | Files |
 |------|-------------|-------|
-| **14.1** macOS code signing | Apple Developer ID, hardened runtime, entitlements, notarization via @electron/notarize | `build/entitlements.mac.plist`, `scripts/notarize.js` |
-| **14.2** Windows code signing | EV certificate, Authenticode, SHA-256, timestamp counter-signature | `scripts/custom-sign.js` |
-| **14.3** Linux packaging | .deb + .rpm + .AppImage with GPG signatures | Forge config |
-| **14.4** GitHub Actions CI/CD | Multi-platform build pipeline with secret management, SBOM generation | `.github/workflows/release.yml` |
-| **14.5** Auto-updater | electron-updater with GitHub Releases, signature verification, staged rollout, user prompt | `src/main/services/auto-updater.ts` |
+| **17.1** macOS code signing | Apple Developer ID, hardened runtime, entitlements, notarization | `build/entitlements.mac.plist`, `scripts/notarize.js` |
+| **17.2** Windows code signing | EV certificate, Authenticode, SHA-256, timestamp | `scripts/custom-sign.js` |
+| **17.3** Linux packaging | .deb + .rpm + .AppImage with GPG signatures | Forge config |
+| **17.4** GitHub Actions CI/CD | Multi-platform build pipeline, SBOM generation | `.github/workflows/release.yml` |
+| **17.5** Auto-updater | electron-updater, signature verification, staged rollout | `src/main/services/auto-updater.ts` |
 
-#### Week 15: Licensing & Telemetry
-
-| Task | Description | Files |
-|------|-------------|-------|
-| **15.1** License manager | Keygen.sh integration, machine fingerprint, online/offline validation, 30-day grace | `src/main/licensing/` |
-| **15.2** License UI | Activation dialog, license status display, tier indicator | `src/renderer/features/licensing/` |
-| **15.3** Free tier enforcement | 3 active flows, 100 runs/month, feature gating | `src/main/services/tier-manager.ts` |
-| **15.4** Sentry crash reporting | Opt-in, PII scrubbing (paths, tokens, emails), main + renderer initialization | `src/main/telemetry/sentry.ts` |
-| **15.5** PostHog analytics | Opt-in, anonymous, allowlisted properties, self-hosted endpoint | `src/main/telemetry/analytics.ts` |
-
-#### Week 16: Performance Optimization
+#### Week 18: Licensing & Telemetry
 
 | Task | Description | Files |
 |------|-------------|-------|
-| **16.1** V8 bytecode compilation | electron-vite bytecodePlugin for main + preload | `electron.vite.config.ts` update |
-| **16.2** Deferred module loading | Tiered imports: critical first, background second, deferred third | Main process refactor |
-| **16.3** CSS containment | `contain: layout style paint` on major sections, `content-visibility: auto` on list items | CSS updates |
-| **16.4** Performance marks | Instrument startup phases, IPC latency, interaction response times | `src/renderer/shared/lib/perf-marks.ts` |
-| **16.5** CI performance tests | Playwright-driven startup time, memory, FPS, IPC latency tests that fail build on regression | `tests/performance/` |
-| **16.6** Memory management | ScopedIPC cleanup, WeakRef caches, GC hints on state transitions, memory monitor | Various files |
+| **18.1** License manager | Keygen.sh integration, machine fingerprint, offline validation, 30-day grace | `src/main/licensing/` |
+| **18.2** License UI | Activation dialog, license status, tier indicator | `src/renderer/features/licensing/` |
+| **18.3** Free tier enforcement | 3 plugins, 100 AI actions/mo, 5 flows. Upgrade triggers | `src/main/services/tier-manager.ts` |
+| **18.4** Sentry crash reporting | Opt-in, PII scrubbing, main + renderer initialization | `src/main/telemetry/sentry.ts` |
+| **18.5** PostHog analytics | Opt-in, anonymous, allowlisted properties | `src/main/telemetry/analytics.ts` |
 
-**Deliverable**: Signed, notarized, auto-updating app. Licensed with free/pro tiers. Performance budgets enforced in CI.
+#### Week 19: Performance Optimization
+
+| Task | Description | Files |
+|------|-------------|-------|
+| **19.1** V8 bytecode compilation | electron-vite bytecodePlugin for main + preload | `electron.vite.config.ts` update |
+| **19.2** Deferred module loading | Tiered imports: critical first, plugins deferred | Main process refactor |
+| **19.3** Plugin loading optimization | Lazy-load plugin sandboxes, pool isolates, cache compiled bytecode | Plugin system optimization |
+| **19.4** Performance marks | Instrument startup, IPC latency, inbox render time, AI response time | `src/renderer/shared/lib/perf-marks.ts` |
+| **19.5** CI performance tests | Playwright-driven startup time, memory, FPS tests that fail build on regression | `tests/performance/` |
+| **19.6** Memory management | ScopedIPC cleanup, WeakRef caches, GC hints, memory monitor | Various files |
+
+**Deliverable**: Signed, notarized, auto-updating app. Licensed with free/pro tiers. Performance budgets enforced.
 
 ---
 
-### Phase 6: Launch Preparation (Weeks 17-18)
+### Phase 7: Launch (Weeks 20-21)
 
-**Goal**: Public beta ready. Marketing assets. Community infrastructure.
+**Goal**: Public beta ready. Marketing assets. Community.
 
-#### Week 17: Polish & Testing
-
-| Task | Description |
-|------|-------------|
-| **17.1** E2E test suite | Playwright tests for critical flows: create workflow, execute, AI interaction, settings |
-| **17.2** Unit test suite | Vitest tests for stores, utilities, condition engine, DAG executor |
-| **17.3** Accessibility audit | WCAG 2.1 AA compliance check, keyboard navigation testing, screen reader testing |
-| **17.4** Edge case handling | Empty states, error boundaries, offline mode, large flow handling (500+ nodes) |
-| **17.5** Onboarding flow | First-run experience: welcome, API key setup, sample flow creation |
-
-#### Week 18: Launch Infrastructure
+#### Week 20: Polish & Testing
 
 | Task | Description |
 |------|-------------|
-| **18.1** Landing page | devrig.dev with download links, feature showcase, pricing |
-| **18.2** Documentation site | Getting started, flow builder guide, plugin development guide, API reference |
-| **18.3** Discord community | Server setup with channels: general, support, plugin-dev, showcase, feature-requests |
-| **18.4** GitHub repositories | Public SDK repo, template repo, documentation repo |
-| **18.5** Product Hunt preparation | Maker profile, screenshots, video demo, description |
-| **18.6** Waitlist + early access | Email capture, invite system for private beta |
+| **20.1** E2E test suite | Playwright tests: onboarding, inbox, plugin install, AI classification, flow execution |
+| **20.2** Unit test suite | Vitest: stores, AI pipelines, plugin loader, condition engine, sync scheduler |
+| **20.3** Accessibility audit | WCAG 2.1 AA, keyboard navigation, screen reader testing |
+| **20.4** Edge cases | Empty states, error boundaries, offline mode, large inbox handling (10K+ items) |
+| **20.5** Plugin QA | Test all first-party plugins against real accounts: Gmail, GitHub, Linear, Sentry |
 
-**Deliverable**: App ready for public beta. Landing page live. Community channels open. PH launch queued.
+#### Week 21: Launch Infrastructure
+
+| Task | Description |
+|------|-------------|
+| **21.1** Landing page | devrig.dev with download, feature showcase, plugin gallery, pricing |
+| **21.2** Documentation site | Getting started, plugin development guide, AI pipeline guide, API reference |
+| **21.3** Discord community | Channels: general, support, plugin-dev, showcase, feature-requests |
+| **21.4** GitHub repositories | Public SDK repo, plugin template, example plugins, documentation |
+| **21.5** Product Hunt launch | Maker profile, screenshots, video demo, description |
+| **21.6** Waitlist + early access | Email capture, invite system for private beta |
+
+**Deliverable**: App ready for public beta. Landing page live. Community open. PH launch queued.
 
 ---
 
-## 4. Folder Structure
+## 4. Plugin Architecture Detail
+
+### Plugin Manifest Schema
+
+```json
+{
+  "id": "devrig-gmail",
+  "name": "Gmail",
+  "version": "1.0.0",
+  "description": "AI-powered email management",
+  "author": "DevRig",
+  "icon": "./icon.svg",
+  "permissions": {
+    "network": ["gmail.googleapis.com", "oauth2.googleapis.com"],
+    "secrets": ["gmail-oauth-token"],
+    "ai": true
+  },
+  "capabilities": {
+    "dataSources": [{
+      "id": "emails",
+      "name": "Emails",
+      "syncInterval": 60,
+      "entryPoint": "./data-source.js"
+    }],
+    "actions": [{
+      "id": "reply",
+      "name": "Reply",
+      "icon": "reply",
+      "entryPoint": "./actions.js#reply"
+    }, {
+      "id": "archive",
+      "name": "Archive",
+      "entryPoint": "./actions.js#archive"
+    }],
+    "aiPipelines": [{
+      "id": "classify-emails",
+      "name": "Classify Emails",
+      "trigger": "onNewItems",
+      "entryPoint": "./ai-pipeline.js#classify"
+    }, {
+      "id": "draft-reply",
+      "name": "Draft Reply",
+      "trigger": "onAction:reply",
+      "entryPoint": "./ai-pipeline.js#draftReply"
+    }],
+    "views": [{
+      "id": "email-detail",
+      "name": "Email Thread",
+      "type": "detail",
+      "entryPoint": "./views/email-detail.js"
+    }],
+    "flowNodes": [{
+      "type": "trigger",
+      "id": "new-email",
+      "name": "New Email",
+      "configSchema": { "filter": "string" }
+    }, {
+      "type": "action",
+      "id": "send-email",
+      "name": "Send Email",
+      "configSchema": { "to": "string", "subject": "string", "body": "string" }
+    }]
+  }
+}
+```
+
+### Plugin Capability Types
+
+| Capability | Purpose | Example |
+|-----------|---------|---------|
+| **Data Source** | Fetches items from external service, stores in unified inbox | Gmail: fetch emails, GitHub: fetch PRs |
+| **Action** | Performs an operation on an item or external service | Reply to email, merge PR, assign ticket |
+| **AI Pipeline** | Defines how AI processes items from this plugin | Classify email importance, summarize PR changes |
+| **View** | Custom UI component rendered in the app | Email thread viewer, PR diff viewer |
+| **Flow Node** | Custom node for the visual flow builder | "New Email" trigger, "Send Email" action |
+
+### Plugin Lifecycle
+
+```
+Install → Validate Manifest → Request Permissions → Initialize Sandbox
+    → Register Capabilities → Start Data Sync → Active
+    → Disable → Stop Sync → Suspend Sandbox
+    → Uninstall → Cleanup Data → Remove
+```
+
+---
+
+## 5. Unified Inbox Data Model
+
+### New Tables
+
+```sql
+-- Inbox items (unified across all plugins)
+CREATE TABLE inbox_items (
+  id TEXT PRIMARY KEY,
+  plugin_id TEXT NOT NULL REFERENCES plugins(id),
+  external_id TEXT NOT NULL,              -- ID in the external system
+  type TEXT NOT NULL,                     -- 'email', 'pr', 'issue', 'alert', etc.
+  title TEXT NOT NULL,
+  body TEXT,                              -- Full content (may be large)
+  preview TEXT,                           -- Short preview for list view
+  source_url TEXT,                        -- Link to item in external system
+  priority INTEGER NOT NULL DEFAULT 0,    -- AI-assigned priority (0-100)
+  status TEXT NOT NULL DEFAULT 'unread',  -- 'unread', 'read', 'archived', 'snoozed'
+  ai_classification TEXT,                 -- JSON: { label, confidence, reasoning }
+  ai_summary TEXT,                        -- AI-generated summary
+  ai_draft TEXT,                          -- AI-generated draft response
+  metadata TEXT DEFAULT '{}',             -- Plugin-specific metadata (JSON)
+  is_actionable INTEGER DEFAULT 0,       -- Whether this item needs user action
+  snoozed_until INTEGER,                 -- Timestamp for snoozed items
+  external_created_at INTEGER,           -- When created in external system
+  synced_at INTEGER NOT NULL,            -- Last synced from external system
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+-- Plugin sync state
+CREATE TABLE plugin_sync_state (
+  plugin_id TEXT PRIMARY KEY REFERENCES plugins(id),
+  last_sync_at INTEGER,
+  sync_cursor TEXT,                       -- Plugin-specific cursor (e.g., Gmail historyId)
+  sync_status TEXT DEFAULT 'idle',        -- 'idle', 'syncing', 'error'
+  error TEXT,
+  items_synced INTEGER DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+-- AI operations log (for cost tracking)
+CREATE TABLE ai_operations (
+  id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,                 -- 'claude', 'openai', 'gemini', 'local'
+  model TEXT NOT NULL,                    -- 'claude-sonnet-4-5', 'gpt-4o', etc.
+  operation TEXT NOT NULL,                -- 'classify', 'summarize', 'draft', 'complete'
+  plugin_id TEXT REFERENCES plugins(id),
+  input_tokens INTEGER NOT NULL,
+  output_tokens INTEGER NOT NULL,
+  cost_usd REAL,                          -- Estimated cost in USD
+  duration_ms INTEGER,
+  created_at INTEGER NOT NULL
+);
+
+-- Indexes
+CREATE INDEX idx_inbox_items_plugin ON inbox_items(plugin_id, status, priority DESC);
+CREATE INDEX idx_inbox_items_status ON inbox_items(status, priority DESC, created_at DESC);
+CREATE INDEX idx_inbox_items_external ON inbox_items(plugin_id, external_id);
+CREATE INDEX idx_inbox_items_snoozed ON inbox_items(snoozed_until) WHERE snoozed_until IS NOT NULL;
+CREATE INDEX idx_ai_operations_plugin ON ai_operations(plugin_id, created_at DESC);
+CREATE INDEX idx_ai_operations_date ON ai_operations(created_at DESC);
+```
+
+### Existing Tables (Unchanged)
+
+```sql
+-- workspaces, workflows, flow_nodes, flow_edges, executions,
+-- execution_steps, secrets, plugins, settings
+-- (See Phase 1 schema — no changes needed)
+```
+
+---
+
+## 6. Folder Structure
 
 ```
 devrig/
+├── CLAUDE.md
 ├── electron.vite.config.ts
 ├── forge.config.ts
 ├── package.json
 ├── tsconfig.json
-├── tsconfig.main.json
-├── tsconfig.preload.json
-├── tsconfig.renderer.json
-├── build/
-│   └── entitlements.mac.plist
-├── scripts/
-│   ├── notarize.js
-│   └── custom-sign.js
-├── native/                          # NAPI-RS Rust modules (Phase 5+)
-│   ├── Cargo.toml
-│   └── src/
-├── packages/
-│   └── plugin-sdk/                  # @devrig/plugin-sdk
+├── docs/
+│   ├── master-plan.md                   # This file
+│   ├── business-analysis.md
+│   ├── frontend-architecture.md
+│   ├── backend-architecture.md
+│   ├── security-architecture.md
+│   ├── security-architecture-extended.md
+│   └── performance-architecture.md
 ├── src/
-│   ├── main/                        # Electron main process
+│   ├── main/
 │   │   ├── index.ts
 │   │   ├── csp.ts
 │   │   ├── navigation-guard.ts
@@ -405,293 +621,189 @@ devrig/
 │   │   ├── ipc-security.ts
 │   │   ├── ipc/
 │   │   │   ├── db-handlers.ts
-│   │   │   ├── fs-handlers.ts
-│   │   │   ├── ai-handlers.ts
+│   │   │   ├── plugin-handlers.ts       # Plugin management IPC
+│   │   │   ├── ai-handlers.ts           # AI operations IPC
+│   │   │   ├── execution-handlers.ts
 │   │   │   └── system-handlers.ts
 │   │   ├── db/
 │   │   │   ├── connection.ts
 │   │   │   ├── statement-cache.ts
-│   │   │   ├── schema.ts
-│   │   │   ├── migrations/
+│   │   │   ├── schema.ts               # Extended with inbox_items, sync_state, ai_operations
+│   │   │   ├── migrate.ts
 │   │   │   └── repositories/
+│   │   │       ├── workflow.repository.ts
+│   │   │       ├── node.repository.ts
+│   │   │       ├── edge.repository.ts
+│   │   │       ├── execution.repository.ts
+│   │   │       ├── workspace.repository.ts
+│   │   │       ├── settings.repository.ts
+│   │   │       ├── secrets.repository.ts
+│   │   │       ├── plugin.repository.ts
+│   │   │       ├── inbox.repository.ts      # NEW
+│   │   │       └── ai-operations.repository.ts  # NEW
+│   │   ├── ai/                          # AI Provider Layer (NEW)
+│   │   │   ├── provider-interface.ts    # Abstract provider contract
+│   │   │   ├── model-router.ts          # Model selection & fallback
+│   │   │   ├── pipeline-engine.ts       # Composable AI pipelines
+│   │   │   ├── cost-tracker.ts          # Usage & cost tracking
+│   │   │   ├── context-manager.ts       # Smart context injection
+│   │   │   └── providers/
+│   │   │       └── claude-provider.ts   # First-class Claude integration
+│   │   ├── plugins/                     # Plugin System (NEW)
+│   │   │   ├── manifest-schema.ts
+│   │   │   ├── plugin-loader.ts
+│   │   │   ├── plugin-manager.ts
+│   │   │   ├── isolate-sandbox.ts
+│   │   │   ├── permissions.ts
+│   │   │   └── plugin-api.ts
 │   │   ├── services/
 │   │   │   ├── flow-executor.ts
 │   │   │   ├── condition-engine.ts
-│   │   │   ├── ai-service.ts
+│   │   │   ├── sync-scheduler.ts        # Plugin data sync scheduling (NEW)
 │   │   │   ├── auto-updater.ts
 │   │   │   ├── tier-manager.ts
 │   │   │   ├── triggers/
 │   │   │   └── actions/
 │   │   ├── secrets/
 │   │   │   ├── safe-storage.ts
-│   │   │   ├── keytar-provider.ts
 │   │   │   └── field-encryption.ts
-│   │   ├── plugins/
-│   │   │   ├── plugin-loader.ts
-│   │   │   ├── isolate-sandbox.ts
-│   │   │   ├── permissions.ts
-│   │   │   └── plugin-api.ts
-│   │   ├── integrations/
-│   │   │   ├── linear/
-│   │   │   └── github/
 │   │   ├── licensing/
-│   │   │   └── license-manager.ts
-│   │   ├── telemetry/
-│   │   │   ├── sentry.ts
-│   │   │   └── analytics.ts
-│   │   └── templates/
+│   │   └── telemetry/
 │   ├── preload/
 │   │   ├── index.ts
-│   │   └── api.ts
-│   └── renderer/                    # React app (Feature-Sliced Design)
+│   │   └── api.ts                       # Extended with plugin & AI channels
+│   └── renderer/
 │       ├── index.html
 │       ├── main.tsx
 │       ├── app/
 │       │   ├── index.tsx
+│       │   ├── plugin-views.ts          # Plugin view registry (NEW)
 │       │   ├── providers/
 │       │   ├── router/
-│       │   ├── bootstrap.ts
-│       │   ├── data-loader.ts
 │       │   └── styles/
-│       │       ├── globals.css
-│       │       ├── tokens.css
-│       │       └── themes/
 │       ├── pages/
-│       │   ├── dashboard/
-│       │   ├── flow-editor/
+│       │   ├── inbox/                   # PRIMARY PAGE (NEW)
+│       │   │   ├── ui/InboxPage.tsx
+│       │   │   └── index.ts
+│       │   ├── dashboard/               # Overview/stats (secondary)
+│       │   ├── flow-editor/             # Visual flow builder
 │       │   ├── execution-history/
 │       │   ├── settings/
-│       │   └── plugins/
+│       │   └── plugin-marketplace/      # Browse & install plugins (NEW)
 │       ├── widgets/
 │       │   ├── sidebar/
+│       │   ├── layout/
+│       │   ├── detail-panel/            # Item detail side panel (NEW)
+│       │   ├── ai-draft-panel/          # AI draft editor (NEW)
 │       │   ├── flow-canvas/
 │       │   ├── node-palette/
 │       │   ├── property-panel/
 │       │   ├── execution-panel/
-│       │   ├── ai-assistant/
 │       │   └── command-palette/
 │       ├── features/
-│       │   ├── create-node/
-│       │   ├── execute-flow/
+│       │   ├── inbox-filter/            # Inbox filtering (NEW)
+│       │   ├── inbox-actions/           # Inline actions on items (NEW)
+│       │   ├── onboarding/              # First-run experience (NEW)
 │       │   ├── configure-node/
 │       │   ├── import-export/
-│       │   ├── ai-generate/
 │       │   ├── undo-redo/
-│       │   ├── oauth/
-│       │   ├── licensing/
-│       │   └── templates/
+│       │   └── licensing/
 │       ├── entities/
+│       │   ├── inbox-item/              # Unified inbox item (NEW)
+│       │   │   ├── ui/InboxItem.tsx
+│       │   │   ├── model/inbox-store.ts
+│       │   │   ├── api/inbox-ipc.ts
+│       │   │   └── index.ts
+│       │   ├── plugin/                  # Plugin entity (NEW)
+│       │   │   ├── ui/PluginCard.tsx
+│       │   │   ├── model/plugin-store.ts
+│       │   │   └── index.ts
+│       │   ├── ai-provider/             # AI provider entity (NEW)
+│       │   │   ├── model/ai-store.ts
+│       │   │   └── index.ts
 │       │   ├── flow/
 │       │   ├── node/
 │       │   ├── edge/
 │       │   ├── execution/
-│       │   ├── workspace/
-│       │   └── ai-model/
+│       │   └── workspace/
 │       └── shared/
-│           ├── ui/                  # shadcn/ui components
+│           ├── ui/
 │           ├── lib/
 │           ├── hooks/
 │           ├── types/
 │           └── config/
-├── resources/
-│   ├── icon.icns
-│   ├── icon.ico
-│   └── icon.png
+├── plugins/                             # First-party plugins (NEW)
+│   ├── gmail/
+│   ├── github/
+│   ├── linear/
+│   ├── jira/
+│   ├── clickup/
+│   ├── sentry/
+│   ├── datadog/
+│   ├── cloudwatch/
+│   ├── openai-provider/
+│   ├── gemini-provider/
+│   └── local-provider/
+├── packages/
+│   ├── plugin-sdk/                      # @devrig/plugin-sdk
+│   └── plugin-cli/                      # devrig publish CLI
+├── native/
 ├── tests/
-│   ├── unit/
-│   ├── component/
-│   ├── e2e/
-│   └── performance/
-└── .github/
-    └── workflows/
-        ├── ci.yml
-        ├── release.yml
-        └── performance.yml
+├── resources/
+└── .github/workflows/
 ```
 
 ---
 
-## 5. Database Schema (Core Tables)
+## 7. Build Agent Strategy
 
-```sql
--- Workspaces
-CREATE TABLE workspaces (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  settings TEXT DEFAULT '{}',
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
+### Wave 1 (Foundation — COMPLETE)
+- Electron shell, database, design system, layout, state management
 
--- Workflows
-CREATE TABLE workflows (
-  id TEXT PRIMARY KEY,
-  workspace_id TEXT NOT NULL REFERENCES workspaces(id),
-  name TEXT NOT NULL,
-  description TEXT DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'draft',
-  trigger_config TEXT DEFAULT '{}',
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
+### Wave 2 (Parallel) — Plugin & AI Core
+- **Agent A**: Plugin system (manifest, loader, sandbox, permissions, lifecycle) — Tasks 4.1-4.6
+- **Agent B**: AI provider layer (interface, Claude provider, router, pipelines, cost tracking) — Tasks 5.1-5.6
+- **Agent C**: Secrets management + data model extensions (inbox tables, sync state) — Tasks 5.6, 6.1-6.3
 
--- Flow Nodes
-CREATE TABLE flow_nodes (
-  id TEXT PRIMARY KEY,
-  workflow_id TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
-  type TEXT NOT NULL,
-  label TEXT NOT NULL DEFAULT '',
-  x REAL NOT NULL DEFAULT 0,
-  y REAL NOT NULL DEFAULT 0,
-  config TEXT DEFAULT '{}',
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
+### Wave 3 (Parallel) — Unified Inbox
+- **Agent D**: Inbox page + store + item components — Tasks 7.1-7.6
+- **Agent E**: Inline actions + AI draft panel + detail panel — Tasks 8.1-8.5
+- **Agent F**: Command palette + shortcuts + settings — Tasks 9.1-9.5
 
--- Flow Edges
-CREATE TABLE flow_edges (
-  id TEXT PRIMARY KEY,
-  workflow_id TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
-  source_node_id TEXT NOT NULL REFERENCES flow_nodes(id) ON DELETE CASCADE,
-  target_node_id TEXT NOT NULL REFERENCES flow_nodes(id) ON DELETE CASCADE,
-  source_handle TEXT,
-  target_handle TEXT,
-  label TEXT DEFAULT '',
-  created_at INTEGER NOT NULL
-);
+### Wave 4 (Parallel) — First-Party Plugins
+- **Agent G**: Gmail plugin (OAuth, data source, AI pipeline, actions, views) — Tasks 10.1-10.5
+- **Agent H**: GitHub plugin (auth, data sources, AI code review, actions, views) — Tasks 11.1-11.5
+- **Agent I**: Linear plugin + Jira/ClickUp adapters — Tasks 12.1-12.6
 
--- Executions
-CREATE TABLE executions (
-  id TEXT PRIMARY KEY,
-  workflow_id TEXT NOT NULL REFERENCES workflows(id),
-  status TEXT NOT NULL DEFAULT 'pending',
-  trigger_type TEXT NOT NULL,
-  started_at INTEGER,
-  completed_at INTEGER,
-  error TEXT,
-  created_at INTEGER NOT NULL
-);
+### Wave 5 (Parallel) — Flow Builder + Monitoring
+- **Agent J**: Cross-plugin flow builder enhancements + templates — Tasks 13.1-13.6
+- **Agent K**: Monitoring plugins (Sentry, Datadog, CloudWatch) — Tasks 14.1-14.4
+- **Agent L**: Multi-model AI (OpenAI, Gemini, local providers) — Tasks 15.1-15.5
 
--- Execution Steps
-CREATE TABLE execution_steps (
-  id TEXT PRIMARY KEY,
-  execution_id TEXT NOT NULL REFERENCES executions(id) ON DELETE CASCADE,
-  node_id TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending',
-  input TEXT,
-  output TEXT,
-  error TEXT,
-  started_at INTEGER,
-  completed_at INTEGER,
-  duration_ms INTEGER
-);
-
--- Secrets (encrypted)
-CREATE TABLE secrets (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
-  encrypted_value TEXT NOT NULL,
-  provider TEXT NOT NULL DEFAULT 'safeStorage',
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
--- Plugins
-CREATE TABLE plugins (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
-  version TEXT NOT NULL,
-  manifest TEXT NOT NULL,
-  enabled INTEGER NOT NULL DEFAULT 1,
-  installed_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
--- Settings (key-value)
-CREATE TABLE settings (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
--- Indexes
-CREATE INDEX idx_workflows_workspace ON workflows(workspace_id, updated_at DESC);
-CREATE INDEX idx_flow_nodes_workflow ON flow_nodes(workflow_id);
-CREATE INDEX idx_flow_edges_source ON flow_edges(source_node_id);
-CREATE INDEX idx_flow_edges_target ON flow_edges(target_node_id);
-CREATE INDEX idx_executions_workflow ON executions(workflow_id, started_at DESC);
-CREATE INDEX idx_execution_steps_execution ON execution_steps(execution_id);
-```
+### Wave 6 (Sequential) — Production
+- **Agent M**: Code signing + CI/CD — Tasks 17.1-17.5
+- **Agent N**: Licensing + telemetry — Tasks 18.1-18.5
+- **Agent O**: Performance optimization — Tasks 19.1-19.6
 
 ---
 
-## 6. Build Agent Strategy
-
-When implementation begins, the following agents will be launched in sequence (some in parallel where independent):
-
-### Wave 1 (Parallel) - Foundation
-- **Agent A**: Project scaffold (Task 1.1-1.6) - Electron shell, config files, security
-- **Agent B**: Database layer (Task 2.1-2.5) - SQLite, schema, repositories, IPC handlers
-- **Agent C**: Design system (Task 2.6-2.7) - shadcn/ui, tokens, core components
-
-### Wave 2 (Parallel) - Layout & State
-- **Agent D**: App layout + sidebar (Task 3.1-3.2) - Resizable panels, navigation
-- **Agent E**: State management (Task 3.3-3.7) - Zustand stores, optimistic updates, data loading
-- **Agent F**: Dashboard page (Task 3.8) - Flow list, virtual scrolling
-
-### Wave 3 (Parallel) - Flow Builder
-- **Agent G**: React Flow canvas + custom nodes (Task 4.1-4.6) - Visual flow builder
-- **Agent H**: Execution engine (Task 5.3-5.6) - DAG executor, triggers, actions
-- **Agent I**: Node configuration UI (Task 5.1-5.2) - Property panel, config forms
-
-### Wave 4 (Parallel) - AI & UX
-- **Agent J**: AI integration (Task 7.1-7.6) - Claude API, AI nodes, MCP
-- **Agent K**: Command palette + shortcuts (Task 8.1-8.6) - cmdk, keyboard system
-- **Agent L**: Execution UI (Task 6.1-6.6) - Timeline, history, visualization
-
-### Wave 5 (Parallel) - Integrations
-- **Agent M**: Linear integration (Task 10.1-10.5)
-- **Agent N**: GitHub integration (Task 11.1-11.4)
-- **Agent O**: Plugin system (Task 12.1-12.6)
-
-### Wave 6 (Sequential) - Production
-- **Agent P**: Code signing + CI/CD (Task 14.1-14.5)
-- **Agent Q**: Licensing + telemetry (Task 15.1-15.5)
-- **Agent R**: Performance optimization (Task 16.1-16.6)
-
----
-
-## 7. Key Architecture Decisions
+## 8. Key Architecture Decisions
 
 | Decision | Choice | Alternative Considered | Rationale |
 |----------|--------|----------------------|-----------|
-| Desktop framework | Electron | Tauri | User preference; Node.js ecosystem; Cursor/VSCode precedent |
-| UI framework | React 19 + Compiler | Solid, Svelte | Ecosystem (React Flow, cmdk, shadcn); hiring pool |
-| State management | Zustand | MobX, Jotai | Natural React integration; Compiler compatible |
-| Flow builder | @xyflow/react v12 | Rete.js | 50x more downloads; better React integration |
-| Database | SQLite + better-sqlite3 | IndexedDB, PouchDB | Synchronous reads; WAL mode; no external deps |
+| Primary UI | Unified inbox | Flow builder first | Users need to see value immediately; inbox is the daily driver |
+| Architecture | Plugin-first | Hard-coded integrations | Ecosystem moat; community growth; extensibility |
+| AI strategy | Multi-model abstraction | Claude-only | Risk mitigation; user choice; cost optimization |
 | Plugin sandbox | isolated-vm | vm2, QuickJS-WASM | V8-native speed; process-level isolation; no CVEs |
-| Secrets | Electron safeStorage | keytar-only | Built-in; OS keychain delegation; no native rebuild |
-| Licensing | Keygen.sh | Lemon Squeezy | SOC 2; offline grace; Electron-native integration |
-| Design system | shadcn/ui + Radix | Ark UI, MUI | Copy-to-project ownership; Linear uses same stack |
-| Animations | Motion | CSS transitions | Spring physics; WAAPI hybrid; layout animations |
+| Desktop framework | Electron | Tauri | Node.js ecosystem; Cursor/VSCode precedent |
+| UI framework | React 19 + Compiler | Solid, Svelte | Ecosystem (React Flow, cmdk, shadcn); largest talent pool |
+| State management | Zustand | MobX, Jotai | Natural React integration; Compiler compatible |
+| Flow builder | @xyflow/react v12 | Rete.js | 50x more downloads; React-native |
+| Database | SQLite + better-sqlite3 | IndexedDB, PouchDB | Synchronous reads; WAL mode; no external deps |
+| Secrets | Electron safeStorage | keytar-only | Built-in; OS keychain delegation |
+| Licensing | Keygen.sh | Lemon Squeezy | SOC 2; offline grace; Electron-native |
+| Design system | shadcn/ui + Radix | Ark UI, MUI | Copy-to-project; Linear uses same stack |
 | Architecture | Feature-Sliced Design | Atomic Design | Strict layer boundaries; unidirectional imports |
-
----
-
-## 8. Risk Mitigation Checklist
-
-- [ ] **vm2 explicitly banned** - CVE-2026-22709 (CVSS 9.8). Use isolated-vm only.
-- [ ] **nodeIntegration: false** enforced on ALL BrowserWindows
-- [ ] **contextIsolation: true** enforced on ALL BrowserWindows
-- [ ] **IPC channel whitelist** - No raw ipcRenderer exposure
-- [ ] **CSP enforced** both via meta tag and programmatic headers
-- [ ] **Secrets never in localStorage** - safeStorage or keychain only
-- [ ] **Basic_text backend detection** on Linux - refuse to store secrets
-- [ ] **Auto-update signature verification** - electron-builder 24.0+
-- [ ] **SBOM generated** on every release
-- [ ] **npm audit** in CI - fail on high/critical
-- [ ] **Performance budgets** enforced in CI - fail build on regression
 
 ---
 
@@ -699,25 +811,54 @@ When implementation begins, the following agents will be launched in sequence (s
 
 | Tier | Price | Features |
 |------|-------|----------|
-| Free | $0 | 3 flows, 100 runs/mo, community plugins |
-| Pro | $19/mo | Unlimited flows, 2000 runs/mo, AI (500 actions), all plugins |
-| Team | $39/user/mo | Pro + shared flows, team templates, SSO, 5000 runs/user |
-| Enterprise | Custom | Self-hosted, unlimited, custom integrations, SLA |
+| Free | $0 | 3 plugins, 100 AI actions/mo, 5 flows, community support |
+| Pro | $19/mo | Unlimited plugins, 500 AI actions/mo, unlimited flows, all first-party plugins |
+| Team | $39/user/mo | Pro + shared inbox views, team flows, SSO, 2000 AI actions/user |
+| Enterprise | Custom | Self-hosted, unlimited, custom plugins, SLA, audit logs |
 
 **$1M ARR target**: ~3,100-4,400 paying users (achievable within 9-12 months based on comparable growth curves).
 
 ---
 
-## 10. Source Documents
+## 10. Key Use Cases (Plugin Examples)
 
-This plan synthesizes findings from:
+### Gmail + AI
+1. Pull new emails every 60 seconds
+2. AI classifies: Important (needs response), FYI (read later), Noise (auto-archive)
+3. For Important emails: AI drafts a reply based on context
+4. Developer sees only important emails in inbox, with drafts ready to send
 
-1. **DevRig_Business_Analysis.md** - Market research, pricing, GTM, competitive analysis (726 lines, 60+ sources)
-2. **DEVRIG_FRONTEND_ARCHITECTURE.md** - UI framework, state management, design system, animations (1,210 lines, 50+ sources)
-3. **devrig-backend-architecture.md** - Execution engine, database, plugins, AI integration (~2,500 lines)
-4. **devrig-security-architecture.md** - Threat model, Electron security, secrets, code signing, compliance (1,798 lines, 25+ sources)
-5. **devrig-performance-architecture.md** - Performance budgets, startup, rendering, memory, NAPI-RS (2,332 lines, 30+ sources)
+### Linear / Jira + AI
+1. Pull assigned tickets in current sprint/cycle
+2. AI analyzes each ticket: breaks into subtasks, estimates complexity, suggests implementation approach
+3. Developer opens inbox, sees pre-planned tickets ready to work on
+4. One click to create subtasks in Linear/Jira
+
+### GitHub + AI
+1. Pull PRs where review is requested
+2. AI analyzes diff: identifies bugs, style issues, architecture concerns
+3. Developer sees AI review summary in inbox
+4. One click to approve, or edit AI comments before posting
+
+### Sentry + AI
+1. Pull new errors/exceptions
+2. AI analyzes stack traces, correlates with recent deployments
+3. Suggests root cause and fix approach
+4. Developer sees actionable error summaries, not raw stack traces
 
 ---
 
-*This is the master implementation plan for DevRig. Phases 1-3 (Weeks 1-9) produce a functional MVP. Phase 4 (Weeks 10-13) adds integrations and extensibility. Phases 5-6 (Weeks 14-18) prepare for commercial launch.*
+## 11. Source Documents
+
+This plan synthesizes and supersedes findings from:
+
+1. **business-analysis.md** — Market research, pricing, GTM, competitive analysis
+2. **frontend-architecture.md** — UI framework, state management, design system
+3. **backend-architecture.md** — Execution engine, database, plugins, AI integration
+4. **security-architecture.md** — Threat model, Electron security, secrets, code signing
+5. **security-architecture-extended.md** — Extended security reference
+6. **performance-architecture.md** — Performance budgets, startup, rendering, memory
+
+---
+
+*This is the master implementation plan for DevRig v2. Phase 1 (Foundation) is complete. Phase 2-3 (Plugin SDK + Unified Inbox) produce the core product. Phase 4 (First-Party Plugins) demonstrates the platform's value. Phases 5-7 expand the ecosystem and prepare for launch.*

@@ -1,28 +1,31 @@
 # DevRig Backend Architecture
 
-## Comprehensive Automation Engine & Cloud API Design
+## AI-Powered Developer Command Center — Plugin-First Backend Architecture
 
-**Version**: 1.0.0
-**Date**: 2026-02-10
-**Status**: Architecture Specification
+**Version**: 2.0.0
+**Date**: 2026-02-11
+**Status**: Architecture Specification (Revised)
 
 ---
 
 ## Table of Contents
 
 1. [System Overview](#1-system-overview)
-2. [Automation Engine Architecture](#2-automation-engine-architecture)
-3. [Trigger System Design](#3-trigger-system-design)
-4. [Condition Evaluation Engine](#4-condition-evaluation-engine)
-5. [Action Execution Framework](#5-action-execution-framework)
-6. [Plugin SDK Design & API](#6-plugin-sdk-design--api)
-7. [Database Schema (SQL DDL)](#7-database-schema-sql-ddl)
-8. [Worker / Job Queue Architecture](#8-worker--job-queue-architecture)
-9. [AI Integration Layer](#9-ai-integration-layer)
-10. [Cloud Sync Design (Future-Ready)](#10-cloud-sync-design-future-ready)
-11. [Logging & Observability](#11-logging--observability)
-12. [Error Handling & Retry Strategies](#12-error-handling--retry-strategies)
-13. [Package Manifest](#13-package-manifest)
+2. [Plugin Architecture](#2-plugin-architecture)
+3. [AI Provider Layer](#3-ai-provider-layer)
+4. [Sync Scheduler](#4-sync-scheduler)
+5. [Automation Engine Architecture](#5-automation-engine-architecture)
+6. [Trigger System Design](#6-trigger-system-design)
+7. [Condition Evaluation Engine](#7-condition-evaluation-engine)
+8. [Action Execution Framework](#8-action-execution-framework)
+9. [Plugin SDK Design & API](#9-plugin-sdk-design--api)
+10. [Database Schema (SQL DDL)](#10-database-schema-sql-ddl)
+11. [Worker / Job Queue Architecture](#11-worker--job-queue-architecture)
+12. [Legacy AI Integration Layer](#12-legacy-ai-integration-layer)
+13. [Cloud Sync Design (Future-Ready)](#13-cloud-sync-design-future-ready)
+14. [Logging & Observability](#14-logging--observability)
+15. [Error Handling & Retry Strategies](#15-error-handling--retry-strategies)
+16. [Package Manifest](#16-package-manifest)
 
 ---
 
@@ -30,54 +33,85 @@
 
 ### 1.1 Design Philosophy
 
-DevRig is a **local-first** Electron desktop application. Every design decision derives from three constraints:
+DevRig is an **AI-powered developer command center** — a local-first Electron desktop application that unifies a developer's tools, notifications, and workflows into a single intelligent interface. The core application is a **shell + AI brain**; all integrations are delivered as plugins.
 
-1. **No external service dependencies at runtime.** The engine must run with zero network connectivity. Redis, RabbitMQ, Kafka -- none of these may appear as a hard requirement.
-2. **Single-user performance first, multi-user sync second.** The local SQLite database is the source of truth. Cloud sync is additive, never mandatory.
-3. **Plugin-extensible without recompilation.** Third-party developers ship npm packages that DevRig discovers, loads, sandboxes, and manages at runtime.
+Every design decision derives from five principles:
 
-### 1.2 Process Architecture
+1. **Plugin-first architecture.** The core app provides four things: a plugin runtime, an AI provider layer, a unified inbox, and a flow builder. Everything else — GitHub, Linear, Slack, email, CI/CD — is a plugin. Even first-party integrations ship as plugins with no special privileges beyond being pre-installed.
+2. **AI provider abstraction.** Claude is the first-class, built-in AI provider. Additional providers (OpenAI, Gemini, local models) are added as provider plugins. Every AI operation goes through a unified provider interface that handles model routing, fallback chains, cost tracking, and context management.
+3. **Unified inbox backend.** All plugin data flows into a single `inbox_items` table. Plugins push items via a standardized data source contract (`storeItems()`, `queryItems()`, `markRead()`, `archive()`). The AI layer classifies, summarizes, and drafts responses across all items regardless of source.
+4. **No external service dependencies at runtime.** The engine must run with zero network connectivity. Redis, RabbitMQ, Kafka — none of these may appear as a hard requirement. SQLite is the only persistence layer.
+5. **Single-user performance first, multi-user sync second.** The local SQLite database is the source of truth. Cloud sync is additive, never mandatory.
+
+### 1.2 Core Application Components
 
 ```
-+------------------------------------------------------------------+
-|                        Electron Main Process                      |
-|                                                                   |
-|  +------------------+  +-------------------+  +-----------------+ |
-|  |  Engine Core     |  |  Trigger Manager  |  |  Plugin Host    | |
-|  |  (Orchestrator)  |  |  (Event Router)   |  |  (Sandbox Mgr)  | |
-|  +--------+---------+  +--------+----------+  +--------+--------+ |
-|           |                      |                      |         |
-|  +--------v---------+  +--------v----------+  +--------v--------+ |
-|  |  Workflow Runner  |  |  Condition Engine |  |  Action Registry| |
-|  |  (DAG Executor)   |  |  (Rule Evaluator) |  |  (Type Catalog) | |
-|  +--------+---------+  +-------------------+  +-----------------+ |
-|           |                                                       |
-|  +--------v---------------------------------------------------+   |
-|  |                    Job Queue (SQLite-backed)                |   |
-|  +--------+---------------------------------------------------+   |
-|           |                                                       |
-|  +--------v---------+  +-------------------+  +-----------------+ |
-|  |  Worker Pool     |  |  AI Integration   |  |  Sync Engine    | |
-|  |  (Worker Threads)|  |  (Claude/MCP)     |  |  (Future)       | |
-|  +------------------+  +-------------------+  +-----------------+ |
-|                                                                   |
-|  +------------------------------------------------------------+   |
-|  |              SQLite Database (WAL Mode)                     |   |
-|  |              via better-sqlite3 + Drizzle ORM               |   |
-|  +------------------------------------------------------------+   |
-+------------------------------------------------------------------+
++------------------------------------------------------------------------+
+|                         DevRig Core Application                        |
+|                                                                        |
+|  +-------------------+  +--------------------+  +--------------------+ |
+|  |  Plugin Runtime   |  |  AI Provider Layer |  |  Unified Inbox     | |
+|  |  (Host + Sandbox) |  |  (Model Router)    |  |  (Aggregator)      | |
+|  +--------+----------+  +--------+-----------+  +--------+-----------+ |
+|           |                      |                        |            |
+|  +--------v----------+  +-------v-----------+  +---------v---------+  |
+|  | Plugin Registry   |  | Provider Registry |  | Inbox Query Engine|  |
+|  | Capability Catalog|  | Pipeline Engine   |  | AI Classification |  |
+|  | Sync Scheduler    |  | Context Manager   |  | Smart Triage      |  |
+|  +-------------------+  | Cost Tracker      |  +-------------------+  |
+|                          +-------------------+                         |
+|  +------------------------------------------------------------------+  |
+|  |                    Flow Builder Engine                            |  |
+|  |  (DAG Executor, Trigger Manager, Action Registry, Job Queue)     |  |
+|  +------------------------------------------------------------------+  |
+|                                                                        |
+|  +------------------------------------------------------------------+  |
+|  |              SQLite Database (WAL Mode)                          |  |
+|  |              via better-sqlite3 + Drizzle ORM                    |  |
+|  +------------------------------------------------------------------+  |
++------------------------------------------------------------------------+
          |                    |                      |
    IPC Bridge           IPC Bridge             IPC Bridge
          |                    |                      |
-+------------------------------------------------------------------+
-|                     Electron Renderer Process                     |
-|                     (React UI - Workflow Editor)                  |
-+------------------------------------------------------------------+
++------------------------------------------------------------------------+
+|                     Electron Renderer Process                           |
+|               (React UI — Inbox, Flow Editor, Plugin Views)            |
++------------------------------------------------------------------------+
 ```
 
 All heavy computation (workflow execution, AI calls, plugin execution, database access) happens in the **Main Process** or in **Worker Threads** spawned from the Main Process. The Renderer Process communicates exclusively through typed IPC channels via `contextBridge`.
 
-### 1.3 Core Data Flow
+### 1.3 Core Data Flows
+
+There are two primary data flows in DevRig: the **plugin data flow** (unified inbox) and the **flow builder execution flow**.
+
+#### Plugin Data Flow (Primary)
+
+```
+Plugin sync fires (on schedule or webhook)
+    |
+    v
+Plugin fetches data from external service (GitHub, Linear, Slack, etc.)
+    |
+    v
+Plugin calls storeItems() with normalized inbox items
+    |
+    v
+Items inserted/updated in inbox_items table
+    |
+    v
+AI pipeline triggered on new items:
+    classify() --> filter() --> summarize() --> draft()
+    |
+    v
+AI-enriched items available in unified inbox
+    |
+    v
+User views, acts on, or snoozes items
+    (actions route back through plugin action contract)
+```
+
+#### Flow Builder Execution Flow
 
 ```
 Trigger fires
@@ -115,9 +149,966 @@ Run completes --> Store results --> Emit completion event
 
 ---
 
-## 2. Automation Engine Architecture
+## 2. Plugin Architecture
 
-### 2.1 Engine Core (Orchestrator)
+### 2.1 Design Rationale
+
+DevRig treats plugins as the fundamental unit of integration. The core application deliberately avoids hard-coding any specific service integration. GitHub, Linear, Slack, email, Jira, Notion — all are plugins. First-party plugins ship pre-installed but use the exact same APIs and sandbox as third-party plugins.
+
+This design provides:
+- **Decoupled development**: Integration teams work independently without touching core code.
+- **User control**: Users install only the integrations they need.
+- **Ecosystem growth**: Third-party developers extend DevRig without gating.
+- **Testability**: Each plugin is an isolated unit with a well-defined contract.
+
+### 2.2 Plugin Manifest Schema
+
+Every plugin declares its capabilities in a `devrig-plugin.json` manifest:
+
+```json
+{
+  "name": "devrig-plugin-github",
+  "version": "1.0.0",
+  "displayName": "GitHub",
+  "description": "GitHub notifications, PRs, issues, and actions",
+  "author": "DevRig",
+  "license": "MIT",
+  "engine": ">=1.0.0",
+  "main": "./dist/index.js",
+  "icon": "./assets/icon.svg",
+  "permissions": [
+    "network",
+    "secrets:read",
+    "inbox:write",
+    "ai:classify"
+  ],
+  "capabilities": {
+    "dataSources": [
+      {
+        "id": "github.notifications",
+        "name": "GitHub Notifications",
+        "description": "Pull requests, issues, reviews, CI status",
+        "defaultSyncIntervalMs": 60000,
+        "configSchema": "./schemas/notifications-config.json"
+      },
+      {
+        "id": "github.pull_requests",
+        "name": "Pull Requests",
+        "description": "Open PRs across configured repositories",
+        "defaultSyncIntervalMs": 120000,
+        "configSchema": "./schemas/pr-config.json"
+      }
+    ],
+    "actions": [
+      {
+        "id": "github.merge_pr",
+        "name": "Merge Pull Request",
+        "description": "Merge a pull request with configurable strategy",
+        "inputSchema": "./schemas/merge-pr-input.json",
+        "outputSchema": "./schemas/merge-pr-output.json",
+        "appliesTo": ["github.pull_requests"]
+      },
+      {
+        "id": "github.create_issue",
+        "name": "Create Issue",
+        "inputSchema": "./schemas/create-issue-input.json",
+        "outputSchema": "./schemas/create-issue-output.json"
+      },
+      {
+        "id": "github.comment",
+        "name": "Add Comment",
+        "inputSchema": "./schemas/comment-input.json",
+        "appliesTo": ["github.pull_requests", "github.notifications"]
+      }
+    ],
+    "aiPipelines": [
+      {
+        "id": "github.classify_notification",
+        "name": "Classify GitHub Notification",
+        "description": "Classify notification urgency and category",
+        "appliesTo": ["github.notifications"],
+        "stages": ["classify", "summarize"],
+        "promptTemplates": {
+          "classify": "./prompts/classify-notification.md",
+          "summarize": "./prompts/summarize-notification.md"
+        }
+      },
+      {
+        "id": "github.draft_review",
+        "name": "Draft PR Review",
+        "appliesTo": ["github.pull_requests"],
+        "stages": ["summarize", "draft"],
+        "promptTemplates": {
+          "summarize": "./prompts/summarize-pr.md",
+          "draft": "./prompts/draft-review.md"
+        }
+      }
+    ],
+    "views": [
+      {
+        "id": "github.pr_detail",
+        "name": "PR Detail View",
+        "component": "./views/PRDetailView",
+        "appliesTo": ["github.pull_requests"]
+      }
+    ],
+    "flowNodes": [
+      {
+        "type": "trigger",
+        "id": "github.push",
+        "name": "GitHub Push Event",
+        "configSchema": "./schemas/push-trigger.json"
+      },
+      {
+        "type": "action",
+        "id": "github.create_issue",
+        "name": "Create GitHub Issue",
+        "category": "github",
+        "inputSchema": "./schemas/create-issue-input.json",
+        "outputSchema": "./schemas/create-issue-output.json"
+      },
+      {
+        "type": "condition",
+        "id": "github.is_default_branch",
+        "name": "Is Default Branch"
+      }
+    ]
+  },
+  "settingsSchema": "./schemas/settings.json"
+}
+```
+
+### 2.3 Capability Types
+
+| Capability | Description | Contract |
+|-----------|-------------|----------|
+| **dataSources** | Defines data the plugin can fetch and push into the unified inbox. Each data source has its own sync interval and configuration. | `storeItems()`, `queryItems()`, `markRead()`, `archive()` |
+| **actions** | Operations the plugin can perform on inbox items or external services. Actions can be scoped to specific data source types via `appliesTo`. | `execute(input, context): ActionResult` |
+| **aiPipelines** | AI processing rules the plugin defines for its data. Pipelines are composable stages (classify, filter, summarize, draft) with plugin-provided prompt templates. | Prompt templates + stage configuration |
+| **views** | Custom UI components the plugin registers for rendering inbox items or detail views. | React component contract (rendered in sandboxed iframe) |
+| **flowNodes** | Trigger, action, and condition nodes the plugin registers for use in the flow builder. | Same contract as existing flow builder nodes (Section 9) |
+
+### 2.4 Plugin Lifecycle
+
+```
+install --> validate --> permission_request --> sandbox --> register_capabilities --> sync --> active
+
+install:
+  - User selects plugin from marketplace or provides npm package name
+  - npm install in isolated directory (~/.devrig/plugins/<name>/)
+  - Store metadata in plugins table
+
+validate:
+  - Parse and validate devrig-plugin.json manifest against schema
+  - Check engine version compatibility (semver range)
+  - Verify all referenced schemas and prompt templates exist and parse
+  - Validate permission declarations are complete for declared capabilities
+    (e.g., dataSources require inbox:write, aiPipelines require ai:classify)
+
+permission_request:
+  - Present user with permission summary dialog
+  - User approves or rejects
+  - Store granted permissions in plugins table
+
+sandbox:
+  - Load plugin entry point in isolated-vm V8 isolate (see Section 9.3)
+  - Inject SDK with permission-gated host functions
+  - Apply resource limits (128MB memory, 5s CPU timeout per invocation)
+
+register_capabilities:
+  - Call plugin.activate(sdk) lifecycle hook
+  - Plugin registers data sources, actions, AI pipelines, views, flow nodes
+  - Core validates each registration against the manifest (no undeclared capabilities)
+  - Capabilities stored in plugin_capabilities table for fast lookup
+
+sync:
+  - For each registered data source, create initial sync job
+  - Sync scheduler picks up jobs and runs first sync
+  - Plugin fetches data and calls storeItems() to populate inbox
+
+active:
+  - Plugin is fully operational
+  - Data sources sync on configured intervals
+  - Actions available in inbox context menus and flow builder
+  - AI pipelines run on new/updated inbox items
+  - Views render when user opens matching inbox items
+```
+
+### 2.5 Plugin Data Source Contract
+
+Plugins interact with the unified inbox through a standardized data source API injected via the SDK:
+
+```typescript
+interface PluginDataSourceSDK {
+  /**
+   * Store or update items in the unified inbox.
+   * Items are upserted by (plugin_id, external_id).
+   * The plugin is responsible for mapping its domain data to InboxItem format.
+   */
+  storeItems(items: InboxItemInput[]): Promise<{ created: number; updated: number }>;
+
+  /**
+   * Query items previously stored by this plugin.
+   * Plugins can only query their own items (enforced by sandbox).
+   */
+  queryItems(query: InboxQuery): Promise<InboxItem[]>;
+
+  /**
+   * Mark items as read. Updates the status field.
+   */
+  markRead(externalIds: string[]): Promise<void>;
+
+  /**
+   * Archive items. Moves them out of the active inbox.
+   */
+  archive(externalIds: string[]): Promise<void>;
+
+  /**
+   * Report sync progress for UI feedback.
+   */
+  reportSyncProgress(progress: SyncProgress): void;
+}
+
+interface InboxItemInput {
+  externalId: string;            // Unique ID within this plugin (e.g., GitHub notification ID)
+  type: string;                  // Plugin-scoped type (e.g., 'pull_request', 'issue', 'review')
+  title: string;
+  body?: string;                 // Full content (markdown supported)
+  preview?: string;              // Short preview text (max 280 chars)
+  sourceUrl?: string;            // URL to open in browser
+  priority?: 'urgent' | 'high' | 'normal' | 'low';
+  isActionable?: boolean;        // Does this item require user action?
+  metadata?: Record<string, unknown>;  // Plugin-specific structured data
+  externalCreatedAt?: string;    // When the item was created in the source system
+}
+
+interface InboxQuery {
+  types?: string[];
+  status?: ('unread' | 'read' | 'archived' | 'snoozed')[];
+  priority?: string[];
+  isActionable?: boolean;
+  search?: string;               // Full-text search in title + body
+  limit?: number;
+  offset?: number;
+  orderBy?: 'created_at' | 'updated_at' | 'priority';
+}
+```
+
+### 2.6 Plugin Action Contract
+
+Actions operate on inbox items or external services. They are surfaced in the UI as context menu items, command palette entries, and flow builder nodes:
+
+```typescript
+interface PluginActionSDK {
+  /**
+   * Register an action handler.
+   * The action ID must match one declared in the manifest.
+   */
+  registerAction(actionId: string, handler: ActionHandler): void;
+}
+
+type ActionHandler = (
+  input: unknown,
+  context: ActionContext
+) => Promise<ActionResult>;
+
+interface ActionContext {
+  /** The inbox item this action was invoked on (if applicable) */
+  inboxItem?: InboxItem;
+  /** Scoped logger */
+  logger: Logger;
+  /** Secret access (permission-gated) */
+  secrets: SecretsAccessor;
+  /** HTTP client (permission-gated) */
+  http: HttpClient;
+  /** Abort signal for cancellation */
+  signal: AbortSignal;
+}
+
+interface ActionResult {
+  success: boolean;
+  output?: unknown;
+  /** If the action modified the inbox item, return the updated fields */
+  itemUpdate?: Partial<InboxItemInput>;
+  error?: { code: string; message: string };
+}
+```
+
+### 2.7 Plugin AI Pipeline Contract
+
+Plugins define AI processing pipelines for their data sources. Pipelines are composable chains of stages:
+
+```typescript
+interface PluginAIPipelineSDK {
+  /**
+   * Register an AI pipeline.
+   * Pipeline ID must match one declared in the manifest.
+   */
+  registerPipeline(pipelineId: string, config: PipelineConfig): void;
+}
+
+interface PipelineConfig {
+  /** Which data source types this pipeline applies to */
+  appliesTo: string[];
+
+  /** When to run: on new items, on update, or manual */
+  trigger: 'on_new' | 'on_update' | 'manual';
+
+  /** Ordered list of pipeline stages */
+  stages: PipelineStage[];
+}
+
+type PipelineStage =
+  | ClassifyStage
+  | FilterStage
+  | SummarizeStage
+  | DraftStage;
+
+interface ClassifyStage {
+  type: 'classify';
+  /** Prompt template with {{item.title}}, {{item.body}}, {{item.metadata}} variables */
+  promptTemplate: string;
+  /** Classification categories */
+  categories: string[];
+  /** Model preference (optional, defaults to AI provider layer routing) */
+  model?: string;
+}
+
+interface FilterStage {
+  type: 'filter';
+  /** Condition to continue pipeline. If false, remaining stages are skipped. */
+  condition: (classification: Record<string, unknown>) => boolean;
+}
+
+interface SummarizeStage {
+  type: 'summarize';
+  promptTemplate: string;
+  maxTokens?: number;
+  model?: string;
+}
+
+interface DraftStage {
+  type: 'draft';
+  promptTemplate: string;
+  /** Draft type hint for UI rendering */
+  draftType: 'reply' | 'comment' | 'review' | 'message';
+  model?: string;
+}
+```
+
+### 2.8 Plugin View Contract
+
+Plugins register custom views for rendering inbox items. Views are React components rendered in sandboxed iframes:
+
+```typescript
+interface PluginViewSDK {
+  /**
+   * Register a view component.
+   * View ID must match one declared in the manifest.
+   */
+  registerView(viewId: string, config: ViewConfig): void;
+}
+
+interface ViewConfig {
+  /** Which inbox item types this view applies to */
+  appliesTo: string[];
+  /** The React component (bundled, loaded in sandboxed iframe) */
+  component: string;  // Path relative to plugin root
+  /** Default dimensions */
+  defaultWidth?: number;
+  defaultHeight?: number;
+}
+```
+
+### 2.9 Plugin Flow Node Contract
+
+Plugins register nodes for the flow builder. This extends the existing trigger, action, and condition system:
+
+```typescript
+interface PluginFlowNodeSDK {
+  /**
+   * Register a trigger node. When the trigger fires, it creates a TriggerEvent.
+   */
+  registerTrigger(nodeId: string, handler: TriggerHandler): void;
+
+  /**
+   * Register an action node for the flow builder.
+   */
+  registerFlowAction(nodeId: string, executor: ActionExecutor): void;
+
+  /**
+   * Register a condition node for the flow builder.
+   */
+  registerCondition(nodeId: string, evaluator: ConditionEvaluator): void;
+}
+```
+
+> **Note**: The flow node contract is identical to the existing Plugin SDK API in Section 9.4. It is listed here for completeness; plugins that only need flow builder integration can use the simpler Section 9 interface.
+
+---
+
+## 3. AI Provider Layer
+
+### 3.1 Provider Interface
+
+All AI operations in DevRig go through a unified provider interface. This abstraction allows model routing, fallback chains, and cost tracking across providers:
+
+```typescript
+interface AIProvider {
+  readonly id: string;             // e.g., 'anthropic', 'openai', 'ollama'
+  readonly name: string;           // e.g., 'Anthropic Claude'
+  readonly models: AIModelInfo[];
+
+  /** Generate a complete response */
+  complete(request: AICompleteRequest): Promise<AICompleteResponse>;
+
+  /** Stream a response token-by-token */
+  stream(request: AICompleteRequest): AsyncIterable<AIStreamEvent>;
+
+  /** Classify content into categories */
+  classify(request: AIClassifyRequest): Promise<AIClassifyResponse>;
+
+  /** Generate a summary */
+  summarize(request: AISummarizeRequest): Promise<AISummarizeResponse>;
+
+  /** Draft a response (reply, comment, review) */
+  draft(request: AIDraftRequest): Promise<AIDraftResponse>;
+
+  /** Check if the provider is configured and reachable */
+  healthCheck(): Promise<{ ok: boolean; error?: string }>;
+}
+
+interface AIModelInfo {
+  id: string;                      // e.g., 'claude-sonnet-4-20250514'
+  name: string;                    // e.g., 'Claude Sonnet 4'
+  contextWindow: number;           // e.g., 200000
+  maxOutputTokens: number;         // e.g., 8192
+  supportedOperations: AIOperation[];
+  inputPricePer1kTokens: number;
+  outputPricePer1kTokens: number;
+}
+
+type AIOperation = 'complete' | 'stream' | 'classify' | 'summarize' | 'draft';
+
+interface AICompleteRequest {
+  model?: string;                  // If omitted, model router selects
+  systemPrompt?: string;
+  messages: AIMessage[];
+  maxTokens?: number;
+  temperature?: number;
+  responseFormat?: 'text' | 'json';
+  jsonSchema?: object;
+  tools?: ToolDefinition[];
+  signal?: AbortSignal;
+}
+
+interface AICompleteResponse {
+  content: string;
+  model: string;
+  provider: string;
+  usage: AIUsage;
+  durationMs: number;
+  finishReason: 'end_turn' | 'max_tokens' | 'tool_use' | 'stop';
+}
+
+interface AIUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  totalCostUsd: number;
+}
+
+interface AIClassifyRequest {
+  content: string;
+  categories: string[];
+  model?: string;
+  promptOverride?: string;
+}
+
+interface AIClassifyResponse {
+  classification: string;         // The selected category
+  confidence: number;             // 0-1
+  reasoning?: string;
+  usage: AIUsage;
+}
+
+interface AISummarizeRequest {
+  content: string;
+  maxLength?: number;              // Max summary length in tokens
+  style?: 'brief' | 'detailed' | 'bullet_points';
+  model?: string;
+  promptOverride?: string;
+}
+
+interface AISummarizeResponse {
+  summary: string;
+  usage: AIUsage;
+}
+
+interface AIDraftRequest {
+  content: string;                 // The content to draft a response to
+  draftType: 'reply' | 'comment' | 'review' | 'message';
+  context?: string;                // Additional context (e.g., thread history)
+  tone?: 'professional' | 'casual' | 'concise';
+  model?: string;
+  promptOverride?: string;
+}
+
+interface AIDraftResponse {
+  draft: string;
+  usage: AIUsage;
+}
+```
+
+### 3.2 Claude Provider (Built-In, First-Class)
+
+The Claude provider is built into the core application and serves as the default for all operations:
+
+```typescript
+class ClaudeProvider implements AIProvider {
+  readonly id = 'anthropic';
+  readonly name = 'Anthropic Claude';
+  readonly models: AIModelInfo[] = [
+    {
+      id: 'claude-sonnet-4-20250514',
+      name: 'Claude Sonnet 4',
+      contextWindow: 200_000,
+      maxOutputTokens: 8192,
+      supportedOperations: ['complete', 'stream', 'classify', 'summarize', 'draft'],
+      inputPricePer1kTokens: 0.003,
+      outputPricePer1kTokens: 0.015,
+    },
+    {
+      id: 'claude-opus-4-20250514',
+      name: 'Claude Opus 4',
+      contextWindow: 200_000,
+      maxOutputTokens: 32768,
+      supportedOperations: ['complete', 'stream', 'classify', 'summarize', 'draft'],
+      inputPricePer1kTokens: 0.015,
+      outputPricePer1kTokens: 0.075,
+    },
+    {
+      id: 'claude-haiku-3-20250307',
+      name: 'Claude Haiku 3',
+      contextWindow: 200_000,
+      maxOutputTokens: 4096,
+      supportedOperations: ['complete', 'stream', 'classify', 'summarize', 'draft'],
+      inputPricePer1kTokens: 0.00025,
+      outputPricePer1kTokens: 0.00125,
+    },
+  ];
+
+  // Implementation wraps @anthropic-ai/sdk (see Section 12 for details)
+}
+```
+
+### 3.3 Additional Providers (As Plugins)
+
+Non-Claude AI providers are installed as plugins. They implement the same `AIProvider` interface:
+
+```typescript
+// devrig-plugin-openai/src/index.ts
+devrig.activate(async (sdk) => {
+  sdk.ai.registerProvider({
+    id: 'openai',
+    name: 'OpenAI',
+    models: [
+      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000, /* ... */ },
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', contextWindow: 128000, /* ... */ },
+    ],
+    complete: async (request) => { /* ... */ },
+    stream: async function*(request) { /* ... */ },
+    classify: async (request) => { /* ... */ },
+    summarize: async (request) => { /* ... */ },
+    draft: async (request) => { /* ... */ },
+    healthCheck: async () => { /* ... */ },
+  });
+});
+
+// devrig-plugin-ollama/src/index.ts (local models)
+devrig.activate(async (sdk) => {
+  sdk.ai.registerProvider({
+    id: 'ollama',
+    name: 'Ollama (Local)',
+    models: [], // Discovered dynamically from local Ollama instance
+    // ...
+  });
+});
+```
+
+### 3.4 Model Router
+
+The model router selects the appropriate model for each AI operation based on task requirements, user preferences, and cost constraints:
+
+```typescript
+interface ModelRouter {
+  /**
+   * Select the best model for a given operation.
+   * Considers: task type, user preferences, cost tier, model availability, fallback chains.
+   */
+  route(request: RouteRequest): RoutedModel;
+
+  /** Configure routing rules */
+  setRules(rules: RoutingRules): void;
+}
+
+interface RouteRequest {
+  operation: AIOperation;
+  pluginId?: string;               // Plugin requesting the operation
+  preferredModel?: string;         // Explicit model preference
+  contextSize?: number;            // Estimated input size in tokens
+  budgetConstraint?: 'cheapest' | 'balanced' | 'best';
+}
+
+interface RoutedModel {
+  providerId: string;
+  modelId: string;
+  reason: string;                  // Why this model was selected
+}
+
+interface RoutingRules {
+  /** Default model per operation type */
+  defaults: Record<AIOperation, { providerId: string; modelId: string }>;
+
+  /** Per-plugin model overrides */
+  pluginOverrides: Record<string, Record<AIOperation, { providerId: string; modelId: string }>>;
+
+  /** Fallback chain: if primary fails, try these in order */
+  fallbackChain: Array<{ providerId: string; modelId: string }>;
+
+  /** Cost routing: use cheaper models for high-volume operations */
+  costTiers: {
+    classify: 'cheapest' | 'balanced' | 'best';
+    summarize: 'cheapest' | 'balanced' | 'best';
+    draft: 'cheapest' | 'balanced' | 'best';
+    complete: 'cheapest' | 'balanced' | 'best';
+  };
+}
+```
+
+**Default routing strategy**:
+- `classify` operations use the cheapest available model (Haiku 3 or GPT-4o Mini).
+- `summarize` operations use a balanced model (Sonnet 4 or GPT-4o).
+- `draft` operations use a balanced model with higher temperature.
+- `complete` operations use the user's preferred default model.
+- If the selected model fails, the router walks the fallback chain.
+
+### 3.5 AI Pipeline Engine
+
+The pipeline engine executes composable AI pipelines defined by plugins. A pipeline is a sequence of stages that process inbox items:
+
+```typescript
+interface AIPipelineEngine {
+  /**
+   * Execute a pipeline on an inbox item.
+   * Runs each stage in order, passing outputs from one stage as inputs to the next.
+   */
+  execute(pipelineId: string, item: InboxItem): Promise<PipelineResult>;
+
+  /**
+   * Execute pipelines for all new/updated items from a plugin.
+   * Called automatically after each sync cycle.
+   */
+  processNewItems(pluginId: string, itemIds: string[]): Promise<void>;
+}
+
+interface PipelineResult {
+  pipelineId: string;
+  itemId: string;
+  stages: StageResult[];
+  totalUsage: AIUsage;
+  durationMs: number;
+}
+
+interface StageResult {
+  type: 'classify' | 'filter' | 'summarize' | 'draft';
+  output: unknown;
+  skipped: boolean;                // True if a filter stage stopped the pipeline
+  usage?: AIUsage;
+  durationMs: number;
+}
+```
+
+**Pipeline execution flow**:
+
+```
+1. classify stage:
+   - Render prompt template with item data
+   - Call AIProvider.classify()
+   - Store result in inbox_items.ai_classification
+
+2. filter stage:
+   - Evaluate condition against classification result
+   - If false, skip remaining stages (e.g., filter out low-priority notifications)
+
+3. summarize stage:
+   - Render prompt template with item data + classification
+   - Call AIProvider.summarize()
+   - Store result in inbox_items.ai_summary
+
+4. draft stage:
+   - Render prompt template with item data + classification + summary
+   - Call AIProvider.draft()
+   - Store result in inbox_items.ai_draft
+```
+
+### 3.6 Cost Tracker
+
+All AI operations are tracked in the `ai_operations` table (see Section 10). The cost tracker provides real-time budget enforcement:
+
+```typescript
+interface CostTracker {
+  /** Record a completed AI operation */
+  record(operation: AIOperationRecord): void;
+
+  /** Get total cost for a time period */
+  getTotalCost(period: { from: string; to: string }): Promise<number>;
+
+  /** Get cost breakdown by provider */
+  getCostByProvider(period: { from: string; to: string }): Promise<Record<string, number>>;
+
+  /** Get cost breakdown by plugin */
+  getCostByPlugin(period: { from: string; to: string }): Promise<Record<string, number>>;
+
+  /** Get cost breakdown by pipeline */
+  getCostByPipeline(period: { from: string; to: string }): Promise<Record<string, number>>;
+
+  /** Check if a tier's budget limit is exceeded */
+  checkBudget(tierLimit: number): Promise<{ exceeded: boolean; currentCost: number; remaining: number }>;
+}
+
+interface AIOperationRecord {
+  provider: string;
+  model: string;
+  operation: AIOperation;
+  pluginId?: string;
+  pipelineId?: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  durationMs: number;
+}
+```
+
+### 3.7 Context Manager
+
+The context manager handles smart context injection for AI operations. It manages token budgets and truncation strategies per plugin and operation type:
+
+```typescript
+interface ContextManager {
+  /**
+   * Build context for an AI operation.
+   * Assembles system prompt, item content, conversation history, and plugin-specific context.
+   * Truncates intelligently to fit within the model's context window.
+   */
+  buildContext(request: ContextBuildRequest): BuiltContext;
+}
+
+interface ContextBuildRequest {
+  modelId: string;                 // To determine context window size
+  operation: AIOperation;
+  item?: InboxItem;
+  pluginContext?: string;          // Plugin-provided additional context
+  conversationHistory?: AIMessage[];
+  maxContextTokens?: number;       // Override: max tokens for context (default: 80% of window)
+}
+
+interface BuiltContext {
+  systemPrompt: string;
+  messages: AIMessage[];
+  estimatedTokens: number;
+  truncated: boolean;
+  truncationStrategy: 'none' | 'tail' | 'middle' | 'summary';
+}
+```
+
+**Truncation strategies**:
+- **Tail truncation**: Remove oldest messages first (default for conversation history).
+- **Middle truncation**: Keep the beginning and end, remove the middle (for long documents).
+- **Summary truncation**: Replace truncated content with an AI-generated summary (for very large contexts, uses cheapest model).
+
+---
+
+## 4. Sync Scheduler
+
+### 4.1 Overview
+
+The sync scheduler manages background data synchronization for all plugins. It replaces traditional cron-based approaches with a SQLite-backed job queue that supports configurable intervals, incremental sync, and plugin-specific cursors.
+
+### 4.2 Architecture
+
+```
++------------------------------------------------------------------+
+|                       Sync Scheduler                              |
+|                                                                   |
+|  +------------------+  +-------------------+  +-----------------+ |
+|  | Schedule Manager |  | Job Executor      |  | State Tracker   | |
+|  | (Interval Timer) |  | (Plugin Invoker)  |  | (Cursor/Status) | |
+|  +--------+---------+  +--------+----------+  +--------+--------+ |
+|           |                      |                      |         |
+|  +--------v---------+  +--------v----------+  +--------v--------+ |
+|  | Plugin Registry  |  | Plugin Sandbox    |  | plugin_sync_state| |
+|  | (Data Sources)   |  | (isolated-vm)     |  | (SQLite table)  | |
+|  +------------------+  +-------------------+  +-----------------+ |
++------------------------------------------------------------------+
+```
+
+### 4.3 Sync Job Queue
+
+The sync scheduler uses the existing SQLite-backed job queue (Section 11) with a dedicated `plugin_sync` job type:
+
+```typescript
+interface SyncScheduler {
+  /** Start the scheduler. Registers timers for all active plugin data sources. */
+  start(): void;
+
+  /** Stop the scheduler. Clears all timers. */
+  stop(): void;
+
+  /** Force an immediate sync for a specific data source */
+  syncNow(pluginId: string, dataSourceId: string): Promise<SyncResult>;
+
+  /** Update the sync interval for a data source */
+  setInterval(pluginId: string, dataSourceId: string, intervalMs: number): void;
+
+  /** Get sync status for all data sources */
+  getStatus(): SyncStatusMap;
+}
+
+interface SyncResult {
+  pluginId: string;
+  dataSourceId: string;
+  itemsSynced: number;
+  itemsCreated: number;
+  itemsUpdated: number;
+  duration: number;
+  error?: string;
+}
+
+type SyncStatusMap = Record<string, {
+  dataSourceId: string;
+  pluginId: string;
+  lastSyncAt: string | null;
+  nextSyncAt: string;
+  status: 'idle' | 'syncing' | 'error';
+  error?: string;
+  itemsSynced: number;
+}>;
+```
+
+### 4.4 Incremental Sync with Cursors
+
+Plugins implement incremental sync using cursors. The sync scheduler persists cursor state in the `plugin_sync_state` table so plugins resume from where they left off:
+
+```typescript
+interface PluginSyncHandler {
+  /**
+   * Perform a sync cycle.
+   * @param cursor - The cursor from the last sync (null on first sync)
+   * @param sdk - The plugin SDK with storeItems() etc.
+   * @returns Updated cursor for next sync
+   */
+  sync(cursor: string | null, sdk: PluginDataSourceSDK): Promise<SyncHandlerResult>;
+}
+
+interface SyncHandlerResult {
+  /** Updated cursor for next sync (e.g., timestamp, page token, ETag) */
+  cursor: string;
+  /** Number of items processed */
+  itemCount: number;
+  /** Whether there are more items to fetch (for pagination) */
+  hasMore: boolean;
+}
+```
+
+**Example: GitHub plugin sync handler**:
+
+```typescript
+devrig.activate(async (sdk) => {
+  sdk.dataSources.register('github.notifications', {
+    sync: async (cursor, dataSourceSdk) => {
+      const token = await sdk.secrets.get('github_token');
+      const since = cursor ?? new Date(Date.now() - 7 * 86400000).toISOString();
+
+      const response = await sdk.http.fetch(
+        `https://api.github.com/notifications?since=${since}&all=true`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const notifications = await response.json();
+
+      await dataSourceSdk.storeItems(
+        notifications.map((n: any) => ({
+          externalId: n.id,
+          type: n.subject.type.toLowerCase(),
+          title: n.subject.title,
+          sourceUrl: n.subject.url,
+          priority: n.reason === 'review_requested' ? 'high' : 'normal',
+          isActionable: n.reason === 'review_requested' || n.reason === 'assign',
+          metadata: { reason: n.reason, repository: n.repository.full_name },
+          externalCreatedAt: n.updated_at,
+        }))
+      );
+
+      return {
+        cursor: new Date().toISOString(),
+        itemCount: notifications.length,
+        hasMore: false,
+      };
+    },
+  });
+});
+```
+
+### 4.5 Sync State Tracking
+
+The `plugin_sync_state` table (see Section 10) tracks the state of each plugin data source sync:
+
+| Column | Purpose |
+|--------|---------|
+| `plugin_id` | Which plugin owns this sync state |
+| `data_source_id` | Which data source within the plugin |
+| `last_sync_at` | When the last successful sync completed |
+| `sync_cursor` | Opaque cursor string (timestamp, page token, ETag, etc.) |
+| `sync_status` | Current state: `idle`, `syncing`, `error` |
+| `error` | Last error message (null on success) |
+| `items_synced` | Cumulative count of items synced |
+
+### 4.6 Sync Configuration
+
+Users configure sync intervals per plugin data source via the settings UI:
+
+```typescript
+interface SyncConfig {
+  /** Global minimum interval (prevents abuse). Default: 30000ms (30s) */
+  globalMinIntervalMs: number;
+
+  /** Per-data-source overrides */
+  overrides: Record<string, {
+    intervalMs: number;
+    enabled: boolean;
+    /** Quiet hours: pause sync during these times */
+    quietHours?: { start: string; end: string; timezone: string };
+  }>;
+
+  /** Maximum concurrent syncs across all plugins. Default: 3 */
+  maxConcurrentSyncs: number;
+
+  /** Backoff on repeated failures */
+  errorBackoff: {
+    initialDelayMs: number;       // Default: 60000 (1 min)
+    maxDelayMs: number;           // Default: 3600000 (1 hour)
+    multiplier: number;           // Default: 2
+  };
+}
+```
+
+---
+
+## 5. Automation Engine Architecture
+
+### 5.1 Engine Core (Orchestrator)
 
 The Engine Core is the top-level coordinator. It is a singleton instantiated once during app startup. Its responsibilities are:
 
@@ -152,7 +1143,7 @@ interface EngineCore {
 }
 ```
 
-### 2.2 DAG Execution Model
+### 5.2 DAG Execution Model
 
 Workflows are stored as **Directed Acyclic Graphs**. Each node in the graph is either an **Action Node** (performs work), a **Condition Node** (branches execution), or a **Junction Node** (merges parallel branches).
 
@@ -212,7 +1203,7 @@ interface WorkflowSettings {
    d. Store node output in the run context under `context.nodes[nodeId].output`.
    e. On failure, apply the node's retry policy, then the workflow's error handling strategy.
 
-### 2.3 Workflow Versioning
+### 5.3 Workflow Versioning
 
 Every modification to a workflow creates a new version. Active runs continue on the version they started with. New triggers use the latest version.
 
@@ -237,9 +1228,9 @@ function migrateDefinition(def: unknown, fromVersion: number): WorkflowDefinitio
 
 ---
 
-## 3. Trigger System Design
+## 6. Trigger System Design
 
-### 3.1 Trigger Architecture
+### 6.1 Trigger Architecture
 
 The Trigger Manager owns all trigger instances. It provides a unified interface regardless of trigger type.
 
@@ -272,9 +1263,11 @@ interface TriggerStatus {
 }
 ```
 
-### 3.2 Trigger Types
+### 6.2 Trigger Types
 
-#### 3.2.1 Cron / Schedule Triggers
+> **Note**: In addition to the built-in trigger types below, plugins can register additional trigger types via the Plugin SDK (see Section 2.9 and Section 9.4). Plugin-registered triggers follow the same `TriggerConfig` / `TriggerHandler` interface and participate in the same deduplication and lifecycle management.
+
+#### 6.2.1 Cron / Schedule Triggers
 
 Uses `node-cron` for cron expression parsing and scheduling. Supports standard 5-field and extended 6-field (with seconds) cron expressions.
 
@@ -292,7 +1285,7 @@ interface CronTriggerConfig {
 
 **Persistence**: Cron triggers are re-registered on app startup by reading the `triggers` table. The `last_fired_at` column prevents duplicate fires if the app restarts near a fire boundary.
 
-#### 3.2.2 Webhook Triggers
+#### 6.2.2 Webhook Triggers
 
 A local HTTP server (using Fastify for speed) listens on a configurable port. Each webhook trigger gets a unique path.
 
@@ -322,7 +1315,7 @@ interface TunnelManager {
 }
 ```
 
-#### 3.2.3 File System Triggers
+#### 6.2.3 File System Triggers
 
 Uses `chokidar` (v5) for cross-platform file system watching with native event support.
 
@@ -340,7 +1333,7 @@ interface FileSystemTriggerConfig {
 
 **Debouncing**: File system events are noisy. The trigger debounces events by file path, emitting only after `debounceMs` of silence for a given path. This prevents duplicate fires during file saves (which often produce multiple events).
 
-#### 3.2.4 Polling Triggers
+#### 6.2.4 Polling Triggers
 
 For APIs and data sources that do not support webhooks. The trigger periodically calls a configured endpoint or function and compares the result to the previous state.
 
@@ -370,7 +1363,7 @@ type PollingSource =
 
 This ensures only ~1.5% of polls produce actual workflow runs (matching industry observations from Zapier's data).
 
-#### 3.2.5 Manual Triggers
+#### 6.2.5 Manual Triggers
 
 Fired explicitly by the user through the UI or via the Plugin SDK.
 
@@ -381,7 +1374,7 @@ interface ManualTriggerConfig {
 }
 ```
 
-#### 3.2.6 Event Triggers (Internal)
+#### 6.2.6 Event Triggers (Internal)
 
 Allows workflows to chain: one workflow's completion fires another.
 
@@ -394,7 +1387,7 @@ interface EventTriggerConfig {
 }
 ```
 
-### 3.3 Trigger Deduplication & Idempotency
+### 6.3 Trigger Deduplication & Idempotency
 
 All triggers produce a `TriggerEvent` that includes a deterministic `deduplicationKey`:
 
@@ -413,9 +1406,9 @@ Before enqueuing a workflow run, the Engine Core checks the `trigger_events` tab
 
 ---
 
-## 4. Condition Evaluation Engine
+## 7. Condition Evaluation Engine
 
-### 4.1 Expression Language
+### 7.1 Expression Language
 
 Conditions are expressed as a JSON-based DSL that supports logical operators, comparisons, and data access. The language is intentionally simple to remain serializable and version-safe.
 
@@ -440,7 +1433,7 @@ type ValueRef =
   | { type: 'secret'; key: string };      // From encrypted secrets store
 ```
 
-### 4.2 Evaluation Engine
+### 7.2 Evaluation Engine
 
 The condition evaluator is a pure function with no side effects:
 
@@ -470,7 +1463,7 @@ interface EvaluationContext {
 - **Regex safety**: Patterns are compiled once and cached. A timeout of 100ms is enforced per regex evaluation to prevent ReDoS.
 - **Custom conditions**: Plugins can register custom condition functions. These execute in the plugin's sandbox with a 500ms timeout.
 
-### 4.3 Validation
+### 7.3 Validation
 
 All condition expressions are validated at save time using Zod schemas:
 
@@ -493,9 +1486,11 @@ const conditionExpressionSchema: z.ZodType<ConditionExpression> = z.lazy(() =>
 
 ---
 
-## 5. Action Execution Framework
+## 8. Action Execution Framework
 
-### 5.1 Action Registry
+### 8.1 Action Registry
+
+> **Note**: In addition to built-in action types, plugins can register additional action executors via the Plugin SDK (see Section 2.6 and Section 9.4). Plugin-registered actions appear in the Action Registry alongside built-in actions and are available in the flow builder and inbox action menus.
 
 The Action Registry is a catalog of all available action types. Built-in actions ship with the app; plugin actions are registered dynamically.
 
@@ -543,7 +1538,7 @@ interface ActionResult {
 }
 ```
 
-### 5.2 Built-in Action Types
+### 8.2 Built-in Action Types
 
 | Category | Action Type | Description |
 |----------|------------|-------------|
@@ -569,7 +1564,7 @@ interface ActionResult {
 | Git | `git.commit` | Stage and commit changes |
 | Git | `git.diff` | Get diff output |
 
-### 5.3 Action Execution Pipeline
+### 8.3 Action Execution Pipeline
 
 Each action goes through a standardized pipeline:
 
@@ -603,10 +1598,10 @@ Each action goes through a standardized pipeline:
 
 7. Error Handling
    - If execution throws or returns success: false,
-     apply the retry policy (see Section 12).
+     apply the retry policy (see Section 15).
 ```
 
-### 5.4 Template Engine
+### 8.4 Template Engine
 
 Action configurations support a Handlebars-style template syntax for referencing dynamic data:
 
@@ -622,9 +1617,11 @@ Templates are compiled once at workflow save time and evaluated at runtime. The 
 
 ---
 
-## 6. Plugin SDK Design & API
+## 9. Plugin SDK Design & API
 
-### 6.1 Plugin Manifest
+### 9.1 Plugin Manifest (Legacy Format)
+
+> **Note**: This section describes the original plugin manifest format focused on flow-builder triggers, actions, and conditions. For the expanded plugin manifest schema that includes data sources, AI pipelines, views, and flow nodes, see **Section 2.2**. The legacy format below remains supported; plugins using it are treated as flow-builder-only plugins.
 
 Every plugin is an npm package with a `devrig-plugin.json` manifest (or a `devrig` key in `package.json`):
 
@@ -668,7 +1665,7 @@ Every plugin is an npm package with a `devrig-plugin.json` manifest (or a `devri
 }
 ```
 
-### 6.2 Plugin Lifecycle
+### 9.2 Plugin Lifecycle
 
 ```
 Discovery --> Validation --> Installation --> Activation --> Running --> Deactivation --> Uninstallation
@@ -710,7 +1707,7 @@ Uninstallation:
   - Clean up any orphaned workflow references
 ```
 
-### 6.3 Plugin Sandbox
+### 9.3 Plugin Sandbox
 
 Plugins execute inside `isolated-vm` V8 isolates with strict resource limits. This is the same isolation model used by Screeps (massively multiplayer) and Algolia (production crawlers).
 
@@ -737,7 +1734,7 @@ interface PluginSandbox {
 
 **Why not worker_threads for sandboxing**: Worker threads share the same V8 heap by default. While they run in separate threads, they do not provide a security boundary. `isolated-vm` provides both isolation and resource metering (CPU time, memory limits) that worker threads cannot.
 
-### 6.4 Plugin SDK API
+### 9.4 Plugin SDK API
 
 The SDK is injected into the plugin's sandbox as a global:
 
@@ -800,7 +1797,7 @@ devrig.activate(async (sdk) => {
 });
 ```
 
-### 6.5 Hot Reload for Development
+### 9.5 Hot Reload for Development
 
 During plugin development, DevRig watches the plugin directory with chokidar. On file changes:
 
@@ -813,9 +1810,9 @@ This provides a sub-second feedback loop for plugin developers. Hot reload is di
 
 ---
 
-## 7. Database Schema (SQL DDL)
+## 10. Database Schema (SQL DDL)
 
-### 7.1 Technology Choice
+### 10.1 Technology Choice
 
 - **Database**: SQLite via `better-sqlite3` (synchronous, fastest SQLite binding for Node.js)
 - **ORM**: Drizzle ORM (TypeScript-first, zero-overhead, excellent SQLite support)
@@ -823,7 +1820,7 @@ This provides a sub-second feedback loop for plugin developers. Hot reload is di
 - **Location**: `~/.devrig/data/devrig.db`
 - **Migrations**: Drizzle Kit `generate` + custom app-startup migration runner
 
-### 7.2 SQLite Configuration
+### 10.2 SQLite Configuration
 
 Applied at database open:
 
@@ -837,7 +1834,7 @@ PRAGMA wal_autocheckpoint = 1000;    -- Checkpoint every 1000 pages
 PRAGMA mmap_size = 268435456;        -- 256MB memory-mapped I/O
 ```
 
-### 7.3 Complete DDL
+### 10.3 Complete DDL
 
 ```sql
 -- ============================================================
@@ -1115,9 +2112,121 @@ CREATE TABLE app_settings (
   value             TEXT NOT NULL,                  -- JSON
   updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ============================================================
+-- UNIFIED INBOX (Plugin Data Aggregation)
+-- ============================================================
+
+CREATE TABLE inbox_items (
+  id                TEXT PRIMARY KEY,               -- cuid2
+  plugin_id         TEXT NOT NULL REFERENCES plugins(id) ON DELETE CASCADE,
+  external_id       TEXT NOT NULL,                  -- Unique within plugin (e.g., GitHub notification ID)
+  type              TEXT NOT NULL,                  -- Plugin-scoped type (e.g., 'pull_request', 'issue')
+  title             TEXT NOT NULL,
+  body              TEXT,                           -- Full content (markdown)
+  preview           TEXT,                           -- Short preview (max 280 chars)
+  source_url        TEXT,                           -- URL to open in browser
+  priority          TEXT DEFAULT 'normal',          -- 'urgent', 'high', 'normal', 'low'
+  status            TEXT NOT NULL DEFAULT 'unread', -- 'unread', 'read', 'archived', 'snoozed'
+  ai_classification TEXT,                           -- JSON: { category, confidence, reasoning }
+  ai_summary        TEXT,                           -- AI-generated summary
+  ai_draft          TEXT,                           -- AI-generated draft response
+  metadata          TEXT DEFAULT '{}',              -- JSON: plugin-specific structured data
+  is_actionable     INTEGER NOT NULL DEFAULT 0,     -- boolean: requires user action
+  snoozed_until     TEXT,                           -- Snooze expiry timestamp
+  external_created_at TEXT,                         -- When item was created in source system
+  synced_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(plugin_id, external_id)
+);
+
+CREATE INDEX idx_inbox_plugin ON inbox_items(plugin_id);
+CREATE INDEX idx_inbox_status ON inbox_items(status);
+CREATE INDEX idx_inbox_priority ON inbox_items(priority);
+CREATE INDEX idx_inbox_type ON inbox_items(plugin_id, type);
+CREATE INDEX idx_inbox_actionable ON inbox_items(is_actionable, status);
+CREATE INDEX idx_inbox_snoozed ON inbox_items(status, snoozed_until);
+CREATE INDEX idx_inbox_updated ON inbox_items(updated_at);
+CREATE INDEX idx_inbox_created ON inbox_items(created_at);
+CREATE INDEX idx_inbox_external ON inbox_items(plugin_id, external_id);
+
+-- Full-text search on inbox items
+CREATE VIRTUAL TABLE inbox_items_fts USING fts5(
+  title,
+  body,
+  preview,
+  content='inbox_items',
+  content_rowid='rowid'
+);
+
+-- Triggers to keep FTS index in sync
+CREATE TRIGGER inbox_items_ai AFTER INSERT ON inbox_items BEGIN
+  INSERT INTO inbox_items_fts(rowid, title, body, preview)
+  VALUES (NEW.rowid, NEW.title, NEW.body, NEW.preview);
+END;
+
+CREATE TRIGGER inbox_items_ad AFTER DELETE ON inbox_items BEGIN
+  INSERT INTO inbox_items_fts(inbox_items_fts, rowid, title, body, preview)
+  VALUES ('delete', OLD.rowid, OLD.title, OLD.body, OLD.preview);
+END;
+
+CREATE TRIGGER inbox_items_au AFTER UPDATE ON inbox_items BEGIN
+  INSERT INTO inbox_items_fts(inbox_items_fts, rowid, title, body, preview)
+  VALUES ('delete', OLD.rowid, OLD.title, OLD.body, OLD.preview);
+  INSERT INTO inbox_items_fts(rowid, title, body, preview)
+  VALUES (NEW.rowid, NEW.title, NEW.body, NEW.preview);
+END;
+
+-- ============================================================
+-- PLUGIN SYNC STATE
+-- ============================================================
+
+CREATE TABLE plugin_sync_state (
+  plugin_id         TEXT NOT NULL REFERENCES plugins(id) ON DELETE CASCADE,
+  data_source_id    TEXT NOT NULL,                  -- Data source ID within the plugin
+  last_sync_at      TEXT,                           -- When last successful sync completed
+  sync_cursor       TEXT,                           -- Opaque cursor (timestamp, page token, ETag)
+  sync_status       TEXT NOT NULL DEFAULT 'idle',   -- 'idle', 'syncing', 'error'
+  error             TEXT,                           -- Last error message (null on success)
+  items_synced      INTEGER NOT NULL DEFAULT 0,     -- Cumulative items synced
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (plugin_id, data_source_id)
+);
+
+CREATE INDEX idx_pss_status ON plugin_sync_state(sync_status);
+CREATE INDEX idx_pss_plugin ON plugin_sync_state(plugin_id);
+
+-- ============================================================
+-- AI OPERATIONS (Unified Cost Tracking)
+-- ============================================================
+
+CREATE TABLE ai_operations (
+  id                TEXT PRIMARY KEY,               -- cuid2
+  provider          TEXT NOT NULL,                  -- 'anthropic', 'openai', 'ollama', etc.
+  model             TEXT NOT NULL,                  -- 'claude-sonnet-4-20250514', 'gpt-4o', etc.
+  operation         TEXT NOT NULL,                  -- 'complete', 'stream', 'classify', 'summarize', 'draft'
+  plugin_id         TEXT REFERENCES plugins(id) ON DELETE SET NULL,
+  pipeline_id       TEXT,                           -- AI pipeline that triggered this operation
+  inbox_item_id     TEXT REFERENCES inbox_items(id) ON DELETE SET NULL,
+  run_id            TEXT REFERENCES workflow_runs(id) ON DELETE SET NULL,
+  input_tokens      INTEGER NOT NULL DEFAULT 0,
+  output_tokens     INTEGER NOT NULL DEFAULT 0,
+  cost_usd          REAL NOT NULL DEFAULT 0.0,
+  duration_ms       INTEGER,
+  created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_aiops_provider ON ai_operations(provider);
+CREATE INDEX idx_aiops_plugin ON ai_operations(plugin_id);
+CREATE INDEX idx_aiops_pipeline ON ai_operations(pipeline_id);
+CREATE INDEX idx_aiops_created ON ai_operations(created_at);
+CREATE INDEX idx_aiops_operation ON ai_operations(operation);
+CREATE INDEX idx_aiops_item ON ai_operations(inbox_item_id);
 ```
 
-### 7.4 Migration Strategy
+### 10.4 Migration Strategy
 
 Drizzle Kit generates SQL migration files. A custom migration runner executes them at app startup:
 
@@ -1151,9 +2260,9 @@ async function runMigrations(db: BetterSqlite3.Database): Promise<void> {
 
 ---
 
-## 8. Worker / Job Queue Architecture
+## 11. Worker / Job Queue Architecture
 
-### 8.1 Job Queue (SQLite-Backed, No External Dependencies)
+### 11.1 Job Queue (SQLite-Backed, No External Dependencies)
 
 The job queue is implemented directly on top of SQLite. This avoids any dependency on Redis or other external services while providing persistence and crash recovery.
 
@@ -1203,7 +2312,7 @@ This uses SQLite's implicit row-level locking in WAL mode to ensure exactly-once
 
 **Stale Lock Recovery**: A maintenance task runs every 60 seconds, resetting jobs whose `locked_at` exceeds the timeout (default 5 minutes) back to `pending`.
 
-### 8.2 Worker Thread Pool
+### 11.2 Worker Thread Pool
 
 Worker threads execute the actual workflow DAG. The pool scales between a minimum and maximum thread count based on queue depth.
 
@@ -1247,7 +2356,7 @@ Main Thread
 6. Reports progress, completion, or failure back to the main thread.
 7. Returns to idle state, waiting for the next job.
 
-### 8.3 Concurrency Control
+### 11.3 Concurrency Control
 
 The `p-queue` library provides in-memory concurrency limiting for operations within a worker thread (e.g., limiting concurrent HTTP requests within a single workflow run):
 
@@ -1265,9 +2374,11 @@ At the workflow level, `maxConcurrentRuns` is enforced by the Engine Core before
 
 ---
 
-## 9. AI Integration Layer
+## 12. Legacy AI Integration Layer
 
-### 9.1 Architecture
+> **Note**: This section describes the flow-builder-specific AI integration (Claude API, Claude Code CLI, MCP). For the new unified AI Provider Layer that powers the entire application (inbox AI pipelines, model routing, cost tracking), see **Section 3**. The implementations below remain valid and are used by the flow builder's `ai.prompt`, `ai.code`, and `ai.mcp` action types.
+
+### 12.1 Architecture
 
 The AI Integration Layer provides three integration paths, each suited to different use cases:
 
@@ -1291,7 +2402,7 @@ The AI Integration Layer provides three integration paths, each suited to differ
 +----------------------------------------------------------+
 ```
 
-### 9.2 Claude API Integration (Direct SDK)
+### 12.2 Claude API Integration (Direct SDK)
 
 For structured tasks: summarization, classification, data extraction, code generation.
 
@@ -1395,7 +2506,7 @@ class ClaudeAPIClient {
 }
 ```
 
-### 9.3 Claude Code CLI Integration
+### 12.3 Claude Code CLI Integration
 
 For complex, multi-step coding tasks that benefit from Claude Code's agentic capabilities (file editing, terminal commands, multi-file reasoning).
 
@@ -1462,7 +2573,7 @@ class ClaudeCodeClient {
 }
 ```
 
-### 9.4 MCP (Model Context Protocol) Integration
+### 12.4 MCP (Model Context Protocol) Integration
 
 DevRig acts as both an MCP client (consuming tools from MCP servers) and optionally as an MCP server (exposing its own capabilities to AI tools).
 
@@ -1555,7 +2666,7 @@ class DevRigMCPServer {
 }
 ```
 
-### 9.5 Prompt Template Engine
+### 12.5 Prompt Template Engine
 
 ```typescript
 interface PromptTemplate {
@@ -1585,7 +2696,7 @@ interface PromptVariable {
 
 Templates are stored in a `prompt_templates` table (add to DDL above) and referenced by ID in workflow action configs. This allows prompt iteration without modifying workflows.
 
-### 9.6 Cost Tracking
+### 12.6 Cost Tracking
 
 All AI usage is tracked in the `ai_usage` table. The cost tracker computes USD cost based on per-model pricing:
 
@@ -1621,9 +2732,9 @@ Users can set **budget alerts** (stored in `app_settings`) that pause AI-enabled
 
 ---
 
-## 10. Cloud Sync Design (Future-Ready)
+## 13. Cloud Sync Design (Future-Ready)
 
-### 10.1 Sync Philosophy
+### 13.1 Sync Philosophy
 
 DevRig follows Linear's approach: the local database is the source of truth. The server is a relay and persistence layer, not the authority. This means:
 
@@ -1632,7 +2743,7 @@ DevRig follows Linear's approach: the local database is the source of truth. The
 3. Sync happens in the background.
 4. Conflicts are rare and resolved with Last-Write-Wins (LWW) for most fields.
 
-### 10.2 Sync Architecture
+### 13.2 Sync Architecture
 
 ```
 +-------------------+          +-------------------+          +-------------------+
@@ -1645,7 +2756,7 @@ DevRig follows Linear's approach: the local database is the source of truth. The
 +-------------------+          +-------------------+          +-------------------+
 ```
 
-### 10.3 Sync Protocol
+### 13.3 Sync Protocol
 
 Based on research into Linear's architecture and general local-first patterns:
 
@@ -1686,7 +2797,7 @@ interface SyncOperation {
 | Settings | LWW per key |
 | Rich text / Notes | CRDT via Yjs (future, for collaborative editing) |
 
-### 10.4 Cloud API (Future)
+### 13.4 Cloud API (Future)
 
 ```
 POST   /api/v1/sync/push          -- Push local operations
@@ -1698,7 +2809,7 @@ POST   /api/v1/auth/login          -- Authentication
 POST   /api/v1/auth/refresh        -- Token refresh
 ```
 
-### 10.5 Team Sharing Model
+### 13.5 Team Sharing Model
 
 ```
 Team
@@ -1712,9 +2823,9 @@ The `sync_metadata` table in the DDL above is the foundation for this. It tracks
 
 ---
 
-## 11. Logging & Observability
+## 14. Logging & Observability
 
-### 11.1 Logging Architecture
+### 14.1 Logging Architecture
 
 ```
 +-------------------+     +------------------+     +------------------+
@@ -1760,7 +2871,7 @@ const logger = pino({
 });
 ```
 
-### 11.2 Execution Logging
+### 14.2 Execution Logging
 
 Every workflow run produces structured logs in the `execution_logs` table. The logger is scoped per-run and per-node:
 
@@ -1780,7 +2891,7 @@ function createNodeLogger(runId: string, nodeId: string): Logger {
 - `warn`: Retry triggered, non-fatal errors, slow execution
 - `error`: Action failure, workflow failure, unhandled exceptions
 
-### 11.3 Structured Log Format
+### 14.3 Structured Log Format
 
 ```json
 {
@@ -1796,13 +2907,13 @@ function createNodeLogger(runId: string, nodeId: string): Logger {
 }
 ```
 
-### 11.4 Log Rotation and Retention
+### 14.4 Log Rotation and Retention
 
 - **File logs**: Rotated daily, retained for 30 days, max 100MB total.
 - **SQLite execution logs**: Retained for 90 days by default. A nightly maintenance job deletes older logs.
 - **User-configurable**: Both retention periods are configurable via `app_settings`.
 
-### 11.5 Performance Monitoring
+### 14.5 Performance Monitoring
 
 The engine tracks and exposes metrics without requiring external monitoring infrastructure:
 
@@ -1816,15 +2927,27 @@ interface EngineMetrics {
   activeWorkers: number;
   idleWorkers: number;
 
-  // Execution
+  // Execution (Flow Builder)
   runsActive: number;
   runsCompletedLast1h: number;
   runsFailedLast1h: number;
   avgRunDurationMs: number;
 
+  // Inbox
+  inboxUnreadCount: number;
+  inboxActionableCount: number;
+  inboxItemsLast24h: number;
+
+  // Plugins
+  activePlugins: number;
+  pluginsSyncing: number;
+  pluginSyncErrors: number;
+
   // AI
   aiCostLast24h: number;
   aiTokensLast24h: number;
+  aiOperationsLast24h: number;
+  aiCostByProvider: Record<string, number>;
 
   // System
   memoryUsageMb: number;
@@ -1838,9 +2961,9 @@ These metrics are computed on-demand (not polled) when the Renderer requests the
 
 ---
 
-## 12. Error Handling & Retry Strategies
+## 15. Error Handling & Retry Strategies
 
-### 12.1 Error Classification
+### 15.1 Error Classification
 
 ```typescript
 enum ErrorCategory {
@@ -1864,7 +2987,7 @@ interface DevRigError {
 }
 ```
 
-### 12.2 Retry Policy
+### 15.2 Retry Policy
 
 ```typescript
 interface RetryPolicy {
@@ -1906,7 +3029,7 @@ function computeDelay(policy: RetryPolicy, attempt: number): number {
 }
 ```
 
-### 12.3 Circuit Breaker
+### 15.3 Circuit Breaker
 
 For external service calls (HTTP actions, API integrations), a per-target circuit breaker prevents hammering failing services:
 
@@ -1927,7 +3050,7 @@ enum CircuitState {
 
 **Implementation**: Circuit breaker state is stored in-memory (not persisted) since it represents transient service health. Each unique action target (e.g., hostname for HTTP actions) gets its own circuit breaker instance.
 
-### 12.4 Error Handling at Each Level
+### 15.4 Error Handling at Each Level
 
 | Level | On Error | Behavior |
 |-------|----------|----------|
@@ -1937,7 +3060,7 @@ enum CircuitState {
 | **Engine** | Unhandled exception | Log critical error, mark run as failed, emit `engine:error` event. |
 | **Plugin** | Sandbox error | Log error, deactivate plugin, mark dependent workflows as degraded. |
 
-### 12.5 Dead Letter Queue
+### 15.5 Dead Letter Queue
 
 Jobs that exhaust all retries are moved to a `dead` status in the `job_queue` table. A dedicated UI view shows dead-letter jobs with:
 - Full error history (all attempts).
@@ -1947,9 +3070,9 @@ Jobs that exhaust all retries are moved to a `dead` status in the `job_queue` ta
 
 ---
 
-## 13. Package Manifest
+## 16. Package Manifest
 
-### 13.1 Production Dependencies
+### 16.1 Production Dependencies
 
 ```json
 {
@@ -1976,7 +3099,7 @@ Jobs that exhaust all retries are moved to a `dead` status in the `job_queue` ta
 }
 ```
 
-### 13.2 Development Dependencies
+### 16.2 Development Dependencies
 
 ```json
 {
@@ -1993,7 +3116,7 @@ Jobs that exhaust all retries are moved to a `dead` status in the `job_queue` ta
 }
 ```
 
-### 13.3 Package Justification
+### 16.3 Package Justification
 
 | Package | Purpose | Why This One |
 |---------|---------|-------------|
@@ -2023,43 +3146,83 @@ All communication between the Electron Main and Renderer processes uses typed IP
 // ipc-channels.ts -- shared between main and renderer
 
 interface IPCChannelMap {
-  // Workflow CRUD
+  // ==========================================
+  // Unified Inbox
+  // ==========================================
+  'inbox:list':          { args: InboxQuery; result: InboxItem[] };
+  'inbox:get':           { args: { id: string }; result: InboxItem };
+  'inbox:markRead':      { args: { ids: string[] }; result: void };
+  'inbox:archive':       { args: { ids: string[] }; result: void };
+  'inbox:snooze':        { args: { ids: string[]; until: string }; result: void };
+  'inbox:unsnooze':      { args: { ids: string[] }; result: void };
+  'inbox:search':        { args: { query: string; limit?: number }; result: InboxItem[] };
+  'inbox:stats':         { args: void; result: InboxStats };
+  'inbox:action':        { args: { itemId: string; actionId: string; input?: unknown }; result: ActionResult };
+
+  // ==========================================
+  // Plugins
+  // ==========================================
+  'plugin:list':         { args: void; result: PluginInfo[] };
+  'plugin:install':      { args: { name: string }; result: void };
+  'plugin:uninstall':    { args: { pluginId: string }; result: void };
+  'plugin:toggle':       { args: { pluginId: string; enabled: boolean }; result: void };
+  'plugin:syncNow':      { args: { pluginId: string; dataSourceId: string }; result: SyncResult };
+  'plugin:syncStatus':   { args: void; result: SyncStatusMap };
+  'plugin:settings':     { args: { pluginId: string }; result: PluginSettings };
+  'plugin:updateSettings': { args: { pluginId: string; settings: unknown }; result: void };
+
+  // ==========================================
+  // AI Provider Layer
+  // ==========================================
+  'ai:providers':        { args: void; result: AIProviderInfo[] };
+  'ai:usage':            { args: { period: string }; result: AIUsageSummary };
+  'ai:usageByPlugin':    { args: { period: string }; result: Record<string, AIUsageSummary> };
+  'ai:usageByProvider':  { args: { period: string }; result: Record<string, AIUsageSummary> };
+  'ai:test-prompt':      { args: { templateId: string; variables: Record<string, unknown> }; result: string };
+  'ai:classify':         { args: { itemId: string; pipelineId: string }; result: AIClassifyResponse };
+  'ai:summarize':        { args: { itemId: string; pipelineId: string }; result: AISummarizeResponse };
+  'ai:draft':            { args: { itemId: string; pipelineId: string }; result: AIDraftResponse };
+  'ai:routingRules':     { args: void; result: RoutingRules };
+  'ai:setRoutingRules':  { args: RoutingRules; result: void };
+
+  // ==========================================
+  // Workflow CRUD (Flow Builder)
+  // ==========================================
   'workflow:list':       { args: { folderId?: string }; result: WorkflowSummary[] };
   'workflow:get':        { args: { id: string }; result: WorkflowDefinition };
   'workflow:create':     { args: WorkflowCreateInput; result: string };
   'workflow:update':     { args: WorkflowUpdateInput; result: void };
   'workflow:delete':     { args: { id: string }; result: void };
 
-  // Execution
+  // Execution (Flow Builder)
   'run:trigger':         { args: { workflowId: string; input?: unknown }; result: string };
   'run:cancel':          { args: { runId: string }; result: void };
   'run:get':             { args: { runId: string }; result: RunDetails };
   'run:list':            { args: { workflowId?: string; status?: string; limit?: number }; result: RunSummary[] };
   'run:logs':            { args: { runId: string; level?: string }; result: LogEntry[] };
 
-  // Plugins
-  'plugin:list':         { args: void; result: PluginInfo[] };
-  'plugin:install':      { args: { name: string }; result: void };
-  'plugin:uninstall':    { args: { pluginId: string }; result: void };
-  'plugin:toggle':       { args: { pluginId: string; enabled: boolean }; result: void };
-
-  // AI
-  'ai:usage':            { args: { period: string }; result: AIUsageSummary };
-  'ai:test-prompt':      { args: { templateId: string; variables: Record<string, unknown> }; result: string };
-
-  // Settings
+  // ==========================================
+  // Settings & Secrets
+  // ==========================================
   'settings:get':        { args: { key: string }; result: unknown };
   'settings:set':        { args: { key: string; value: unknown }; result: void };
 
-  // Secrets
   'secrets:list':        { args: void; result: SecretSummary[] };
   'secrets:set':         { args: { name: string; value: string }; result: void };
   'secrets:delete':      { args: { name: string }; result: void };
 
+  // ==========================================
   // Metrics
+  // ==========================================
   'metrics:get':         { args: void; result: EngineMetrics };
 
+  // ==========================================
   // Events (renderer subscribes)
+  // ==========================================
+  'event:inbox-update':  { data: { itemId: string; type: 'new' | 'updated' | 'archived' } };
+  'event:sync-progress': { data: { pluginId: string; dataSourceId: string; progress: number } };
+  'event:sync-complete': { data: SyncResult };
+  'event:ai-pipeline':   { data: { itemId: string; stage: string; status: 'started' | 'completed' } };
   'event:run-progress':  { data: RunProgressEvent };
   'event:run-completed': { data: RunCompletedEvent };
   'event:ai-token':      { data: { runId: string; text: string } };
@@ -2074,6 +3237,55 @@ interface IPCChannelMap {
 ```
 src/
   main/
+    # ============================
+    # Core: Plugin Runtime
+    # ============================
+    plugins/
+      plugin-host.ts            -- Plugin lifecycle management
+      plugin-registry.ts        -- Capability catalog and lookup
+      plugin-sandbox.ts         -- isolated-vm sandbox
+      plugin-sdk.ts             -- SDK injected into sandbox (data sources, actions, AI, views, flow)
+      plugin-discovery.ts       -- Directory scanning and validation
+      plugin-manifest.ts        -- Manifest schema validation (Zod)
+
+    # ============================
+    # Core: AI Provider Layer
+    # ============================
+    ai/
+      provider-interface.ts     -- AIProvider interface definition
+      provider-registry.ts      -- Provider registration and lookup
+      model-router.ts           -- Per-task model selection, fallback chains
+      pipeline-engine.ts        -- Composable AI pipeline execution
+      context-manager.ts        -- Smart context injection, truncation
+      cost-tracker.ts           -- Token/cost tracking across all providers
+      providers/
+        claude.ts               -- Built-in Anthropic Claude provider
+      # Additional providers (OpenAI, Ollama) installed as plugins
+      claude-api.ts             -- Direct Anthropic SDK client (flow builder actions)
+      claude-code.ts            -- Claude Code CLI / Agent SDK
+      mcp-client.ts             -- MCP client manager
+      mcp-server.ts             -- DevRig as MCP server
+      prompt-templates.ts       -- Template CRUD and rendering
+
+    # ============================
+    # Core: Unified Inbox
+    # ============================
+    inbox/
+      inbox-service.ts          -- Inbox CRUD, queries, FTS search
+      inbox-aggregator.ts       -- Cross-plugin item aggregation
+      inbox-actions.ts          -- Action dispatch to plugins
+
+    # ============================
+    # Core: Sync Scheduler
+    # ============================
+    sync-scheduler/
+      scheduler.ts              -- Timer management, job creation
+      sync-executor.ts          -- Plugin sync invocation
+      sync-state.ts             -- Cursor/state persistence
+
+    # ============================
+    # Flow Builder Engine
+    # ============================
     engine/
       core.ts                   -- EngineCore singleton
       dag-executor.ts           -- DAG topological sort and execution
@@ -2098,18 +3310,10 @@ src/
         flow.ts                 -- Control flow actions
         notification.ts         -- Desktop notifications
         git.ts                  -- Git operations
-    ai/
-      claude-api.ts             -- Direct Anthropic SDK client
-      claude-code.ts            -- Claude Code CLI / Agent SDK
-      mcp-client.ts             -- MCP client manager
-      mcp-server.ts             -- DevRig as MCP server
-      prompt-templates.ts       -- Template CRUD and rendering
-      cost-tracker.ts           -- Token and cost tracking
-    plugins/
-      plugin-host.ts            -- Plugin lifecycle management
-      plugin-sandbox.ts         -- isolated-vm sandbox
-      plugin-sdk.ts             -- SDK injected into sandbox
-      plugin-discovery.ts       -- Directory scanning and validation
+
+    # ============================
+    # Infrastructure
+    # ============================
     queue/
       job-queue.ts              -- SQLite-backed job queue
       worker-pool.ts            -- Worker thread management
@@ -2117,13 +3321,21 @@ src/
     database/
       connection.ts             -- better-sqlite3 + WAL config
       schema.ts                 -- Drizzle ORM schema definitions
+      repositories/
+        inbox.repository.ts     -- Inbox item CRUD
+        plugin-sync.repository.ts -- Sync state CRUD
+        ai-operations.repository.ts -- AI cost tracking
+        # ... existing repositories
       migrations/
         0001_initial.sql
         0002_add_ai_usage.sql
+        0003_add_inbox.sql
+        0004_add_plugin_sync.sql
+        0005_add_ai_operations.sql
         ...
       migration-runner.ts       -- Startup migration executor
-    sync/
-      sync-engine.ts            -- Local sync state management
+    cloud-sync/
+      sync-engine.ts            -- Local sync state management (future)
       operation-log.ts          -- Mutation tracking
       conflict-resolver.ts      -- LWW and merge strategies
     logging/

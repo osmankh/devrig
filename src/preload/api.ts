@@ -15,18 +15,31 @@ const INVOKE_CHANNELS = [
   'db:workflow:create',
   'db:workflow:update',
   'db:workflow:delete',
+  'db:node:create',
   'db:node:update',
+  'db:node:delete',
   'db:node:batchCreate',
   'db:node:batchUpdate',
+  'db:edge:create',
+  'db:edge:delete',
+  'db:edge:deleteByWorkflow',
   'db:edge:batchCreate',
   'db:execution:list',
+  'db:execution:create',
+  'db:execution:update',
+  'db:execution:get',
+  'db:execution:getWithSteps',
   'db:settings:get',
-  'db:settings:set'
+  'db:settings:set',
+  'execution:run',
+  'execution:cancel'
 ] as const
 
 const LISTEN_CHANNELS = [
   'app:update-available',
-  'app:update-downloaded'
+  'app:update-downloaded',
+  'execution:step-update',
+  'execution:complete'
 ] as const
 
 type InvokeChannel = (typeof INVOKE_CHANNELS)[number]

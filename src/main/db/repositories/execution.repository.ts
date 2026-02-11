@@ -96,4 +96,76 @@ export class ExecutionRepository {
 
     return { ...existing, status, startedAt, completedAt, error }
   }
+
+  createStep(data: {
+    executionId: string
+    nodeId: string
+    status: string
+  }): ExecutionStep {
+    const id = createId()
+
+    this.stmts
+      .prepare(
+        `INSERT INTO execution_steps (id, execution_id, node_id, status)
+         VALUES (?, ?, ?, ?)`
+      )
+      .run(id, data.executionId, data.nodeId, data.status)
+
+    return {
+      id,
+      executionId: data.executionId,
+      nodeId: data.nodeId,
+      status: data.status,
+      input: null,
+      output: null,
+      error: null,
+      startedAt: null,
+      completedAt: null,
+      durationMs: null
+    }
+  }
+
+  updateStep(
+    id: string,
+    data: {
+      status?: string
+      input?: string
+      output?: string
+      error?: string
+      startedAt?: number
+      completedAt?: number
+      durationMs?: number
+    }
+  ): ExecutionStep | undefined {
+    const existing = this.stmts
+      .prepare('SELECT * FROM execution_steps WHERE id = ?')
+      .get(id) as ExecutionStep | undefined
+
+    if (!existing) return undefined
+
+    const status = data.status ?? existing.status
+    const input = data.input !== undefined ? data.input : existing.input
+    const output = data.output !== undefined ? data.output : existing.output
+    const error = data.error !== undefined ? data.error : existing.error
+    const startedAt = data.startedAt ?? existing.startedAt
+    const completedAt = data.completedAt ?? existing.completedAt
+    const durationMs = data.durationMs ?? existing.durationMs
+
+    this.stmts
+      .prepare(
+        `UPDATE execution_steps SET status = ?, input = ?, output = ?, error = ?, started_at = ?, completed_at = ?, duration_ms = ?
+         WHERE id = ?`
+      )
+      .run(status, input, output, error, startedAt, completedAt, durationMs, id)
+
+    return { ...existing, status, input, output, error, startedAt, completedAt, durationMs }
+  }
+
+  listSteps(executionId: string): ExecutionStep[] {
+    return this.stmts
+      .prepare(
+        'SELECT * FROM execution_steps WHERE execution_id = ? ORDER BY started_at ASC'
+      )
+      .all(executionId) as ExecutionStep[]
+  }
 }

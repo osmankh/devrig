@@ -1,5 +1,5 @@
 # DevRig: Comprehensive Business Analysis
-## AI-Native Developer Workflow Automation Platform
+## AI-Powered Developer Command Center
 ### February 2026
 
 ---
@@ -20,18 +20,19 @@
 
 ## 1. Executive Summary
 
-**DevRig** is a commercial desktop application (Mac + Windows) for AI-native developer workflow automation. It sits at the intersection of three rapidly converging markets: developer tools ($6.4B in 2025, 16.4% CAGR), workflow automation ($23.8B in 2025, 9.5-21.5% CAGR), and AI developer tools ($4.5B in 2025, 17.3% CAGR). The combined addressable market exceeds $34B and is growing at double-digit rates.
+**DevRig** is a commercial desktop application (Mac + Windows) that serves as a unified developer command center powered by AI plugins. It sits at the intersection of three rapidly converging markets: developer tools ($6.4B in 2025, 16.4% CAGR), workflow automation ($23.8B in 2025, 9.5-21.5% CAGR), and AI developer tools ($4.5B in 2025, 17.3% CAGR). The combined addressable market exceeds $34B and is growing at double-digit rates.
 
-**Core Thesis**: No existing tool combines visual workflow automation with AI coding agents as first-class primitives in a desktop-native experience. n8n and Zapier automate business processes but lack deep developer-tooling integration. Cursor and Claude Code provide AI coding but lack workflow orchestration. Linear tracks issues but does not automate the response to them. DevRig bridges these gaps.
+**Core Thesis**: Developers context-switch between a dozen tools every day -- Gmail, Linear, Jira, GitHub, Datadog, Sentry, Slack -- and no product unifies them into a single intelligent hub. Superhuman proved that an AI-powered layer on top of email is worth $30/month; DevRig applies that same model to *every* tool a developer touches. Every integration is a plugin. AI classifies, prioritizes, summarizes, and drafts across all of them. Cross-plugin automations via a visual flow builder give power users programmable control over their entire toolchain.
 
 **Path to $1M ARR**: With a freemium model at $19/month (Pro) and $39/month (Team), DevRig needs approximately 3,300-4,400 paying users to reach $1M ARR. Based on comparable growth trajectories (Cursor hit $100M ARR within months of launch; n8n grew 10x in a single year), this is achievable within 9-12 months with strong execution.
 
 **Key Differentiators**:
-- AI (Claude Code) as a first-class workflow action, not an add-on
-- Desktop-native performance with local execution capabilities
-- Developer-first UX (think Linear's design quality applied to automation)
-- Plugin ecosystem enabling community-driven extensibility
-- Hybrid local + cloud execution model for security-sensitive teams
+- AI-powered unified inbox: one hub for email, issues, PRs, alerts, and messages (Superhuman for all dev tools)
+- Plugin-first architecture: every integration is a first-class plugin, from Gmail to Datadog
+- AI intelligence layer: classify, prioritize, summarize, and draft across all connected tools (Claude first, then OpenAI, Gemini, local models)
+- Cross-plugin automations via visual flow builder for power users
+- Desktop-native performance with local execution and privacy
+- Developer-first UX (Linear's design quality applied to a command center)
 
 ---
 
@@ -96,62 +97,66 @@
 | **Windsurf** | $30M+ enterprise ARR | Growing | Similar to Cursor | AI-native IDE | Strong enterprise traction; 500% YoY growth | Same gaps as Cursor; no workflow layer |
 | **Linear** | $100M rev | 15K+ companies | $8-$16/user/mo | Project management | Best-in-class UX; developer-loved; profitable | Issue tracking only; no automation engine |
 | **Raycast** | $6.5M ARR | Hundreds of thousands DAU | Free/$8/mo Pro | Desktop productivity | Plugin ecosystem (1,500+); Mac-native; community | Mac-only (Windows coming); limited automation; small revenue |
+| **Superhuman** | ~$100M+ ARR | Hundreds of thousands | $30/mo | AI-powered email | Best-in-class AI email UX; instant triage; AI drafting | Email only; no project management, code, or monitoring |
 | **Claude Code** | N/A (Anthropic) | Growing | Usage-based | AI coding agent | Most capable agentic coder; deep reasoning | CLI-only; no visual workflow; no integrations |
 
 ### 3.2 Gap Analysis: What the Market is Missing
 
 ```
-                    Workflow Automation -------- AI Code Agent
-                           |                        |
-                    n8n, Zapier, Make          Cursor, Copilot, Claude Code
-                           |                        |
-                           +---- DEVRIG GAP -----+
-                           |                        |
-                    Desktop-Native            Plugin Ecosystem
-                           |                        |
-                    Cursor, Raycast           Raycast, n8n, VS Code
+                    Unified Inbox / Aggregation ---------- AI Intelligence Layer
+                           |                                      |
+                    (nothing exists)                     Superhuman (email only)
+                           |                                      |
+                           +---------- DEVRIG GAP --------------+
+                           |                                      |
+                    Cross-Tool Automation              Plugin Ecosystem
+                           |                                      |
+                    n8n, Zapier (not dev-focused)       Raycast (no AI inbox)
 ```
 
-**Critical Gap #1: AI-Code-Agent + Workflow Automation Integration**
-- No tool lets you create a flow: "When Linear ticket is assigned with label 'bug' -> Claude Code analyzes the codebase -> generates a PR draft -> notifies Slack"
-- n8n can call APIs but cannot reason about code. Cursor can reason about code but has no workflow engine.
+**Critical Gap #1: No Unified Hub Across Developer Tools**
+- Developers context-switch between Gmail, Linear, Jira, GitHub, Datadog, Sentry, and Slack dozens of times per day
+- Superhuman only does email. Linear only does project management. GitHub only does code. Datadog only does monitoring.
+- No product aggregates all of these into a single, intelligent inbox with a unified notification stream
+- DevRig is the "one ring to rule them all" for developer tools
 
-**Critical Gap #2: Desktop-Native Automation with Local Execution**
+**Critical Gap #2: No AI Intelligence Layer Across Tools**
+- Superhuman proved AI classification, prioritization, and drafting is worth $30/month -- but only for email
+- No product applies that AI intelligence to the full developer toolchain (issues + PRs + alerts + messages)
+- DevRig's AI layer classifies, prioritizes, summarizes, and drafts across every connected plugin
+
+**Critical Gap #3: Desktop-Native Aggregation with Local Execution**
 - Enterprise developers need local execution for security (code never leaves the machine)
 - Cloud-only tools (Zapier, Make, n8n Cloud) cannot access local repos, CLI tools, or private networks
-- Desktop tools (Cursor, Raycast) lack automation pipeline capabilities
+- Desktop tools (Cursor, Raycast) lack a unified inbox or cross-tool intelligence layer
 
-**Critical Gap #3: Developer-First Visual Workflow Builder**
-- n8n's UI is built for ops/business users, not developers
-- Developers want: code-first with visual optional, Git-based workflow versioning, TypeScript/Python extensibility
-- No tool offers Linear-quality UX for building automation flows
-
-**Critical Gap #4: Unified Developer Workflow Hub**
-- Developers currently context-switch between: Linear (tickets) -> Cursor (coding) -> GitHub (PRs) -> Slack (communication) -> n8n (automation)
-- DevRig can be the orchestration layer connecting all of these with AI intelligence
+**Critical Gap #4: Cross-Plugin Automation for Power Users**
+- Developers who use n8n or Zapier for automation get no developer-specific intelligence or UX
+- DevRig's visual flow builder lets power users create cross-plugin automations (e.g., "When Sentry fires a P1 alert -> AI summarizes the stack trace -> creates a Linear ticket -> assigns the on-call developer -> drafts a Slack thread")
+- No tool combines a unified inbox with programmable automation in a single desktop experience
 
 ### 3.3 Competitive Positioning Map
 
 ```
-                        AI-Native
+                     Unified / Multi-Tool
                            ^
                            |
-              Claude Code  |  DevRig (TARGET)
-              Cursor       |
-              Windsurf     |
+                           |  DevRig (TARGET)
+              Raycast      |
+                           |
                            |
     Developer ----+--------+---------+---- Business User
     Focused       |        |         |     Focused
                            |
-              Raycast      |  Zapier
-              Linear       |  Make.com
-                           |  n8n
-                           |
+              Linear       |  Zapier
+              GitHub       |  Make.com
+              Cursor       |  n8n
+              Superhuman   |
                            v
-                      Traditional
+                     Single-Purpose
 ```
 
-DevRig's unique position: **Top-left quadrant** (AI-Native + Developer-Focused) with **workflow automation capabilities** (traditionally bottom-right).
+DevRig's unique position: **Top-left quadrant** (Unified multi-tool aggregation + Developer-Focused) with **AI intelligence across all connected tools**. Superhuman validated the AI-powered inbox model for email; DevRig extends that model to the entire developer toolchain. Raycast aggregates tools via plugins but lacks an AI-powered inbox and cross-plugin intelligence layer.
 
 ---
 
@@ -161,14 +166,15 @@ DevRig's unique position: **Top-left quadrant** (AI-Native + Developer-Focused) 
 
 | Tier | Price | Target User | Key Features |
 |---|---|---|---|
-| **Free** | $0/mo | Individual devs, evaluation | 3 active flows, 100 runs/mo, community plugins, Claude Code trial (50 actions/mo) |
-| **Pro** | $19/mo ($190/yr) | Professional developers | Unlimited flows, 2,000 runs/mo, all plugins, Claude Code (500 actions/mo), local execution |
-| **Team** | $39/user/mo ($390/yr) | Dev teams (2-20) | Everything in Pro + shared flows, team templates, priority support, 5,000 runs/user/mo, SSO |
-| **Enterprise** | Custom ($99+/user/mo) | Large orgs (50+) | Self-hosted, unlimited runs, custom integrations, SLA, dedicated support, audit logs |
+| **Free** | $0/mo | Individual devs, evaluation | 3 plugins, 100 AI actions/mo, 5 flows, community plugin access |
+| **Pro** | $19/mo ($190/yr) | Professional developers | Unlimited plugins, 500 AI actions/mo, unlimited flows, all integrations, local execution |
+| **Team** | $39/user/mo ($390/yr) | Dev teams (2-20) | Everything in Pro + shared inbox views, team flows, SSO, priority support, 2,000 AI actions/user/mo |
+| **Enterprise** | Custom ($99+/user/mo) | Large orgs (50+) | Self-hosted, unlimited AI actions, custom plugin development, SLA, dedicated support, audit logs |
 
 ### 4.2 Pricing Rationale
 
 **Benchmark Analysis**:
+- Superhuman: $30/mo (AI-powered email only)
 - Cursor Pro: $20/mo (pure AI IDE)
 - Raycast Pro: $8/mo (desktop productivity)
 - n8n Cloud: usage-based, avg ~$30/mo for active users
@@ -176,8 +182,9 @@ DevRig's unique position: **Top-left quadrant** (AI-Native + Developer-Focused) 
 - GitHub Copilot: $10-$39/user/mo
 
 **DevRig at $19/mo Pro** is positioned:
-- Above Raycast ($8) - DevRig delivers more automation value
+- Below Superhuman ($30) - DevRig covers more tools than just email, at a lower price
 - Below Cursor ($20) - slightly lower to reduce friction for users already paying for an AI IDE
+- Above Raycast ($8) - DevRig delivers AI intelligence, not just launcher convenience
 - In line with GitHub Copilot Pro ($19) - familiar price point for developers
 - Significantly below enterprise tools ($39+ per seat)
 
@@ -224,16 +231,16 @@ DevRig's unique position: **Top-left quadrant** (AI-Native + Developer-Focused) 
 | Developer tools with strong communities | 3-5% (37% higher retention) | 7-10% |
 
 **DevRig target**: 3-5% conversion rate, achievable through:
-- Strong free-tier value that demonstrates AI workflow power
-- Clear upgrade trigger (hitting run limits on active workflows)
-- Usage-based upsell to Team tier once collaboration needs emerge
+- Strong free-tier value that demonstrates AI-powered unified inbox across 3 plugins
+- Clear upgrade trigger (hitting AI action limits or needing more than 3 plugins)
+- Usage-based upsell to Team tier once shared inbox views and collaboration needs emerge
 
 ### 4.5 Usage-Based Revenue Upside
 
 Beyond subscriptions, DevRig can capture additional revenue through:
-- **AI action credits**: Claude Code API calls beyond tier limits ($0.01-0.05 per action)
+- **AI action credits**: AI calls beyond tier limits ($0.01-0.05 per action, multi-model: Claude, OpenAI, Gemini)
 - **Plugin marketplace**: 15-30% revenue share on premium plugins
-- **Enterprise overages**: Usage beyond plan limits billed per-run
+- **Enterprise overages**: Usage beyond plan limits billed per-action
 
 Estimated uplift: 15-25% additional revenue on top of subscription base.
 
@@ -247,16 +254,16 @@ Estimated uplift: 15-25% additional revenue on top of subscription base.
 
 Based on the success patterns of Linear, Cursor, Raycast, and n8n:
 
-1. **Free tier as the growth engine**: Generous free tier lets developers experience AI-native automation without friction
-2. **Viral workflow sharing**: Public flow templates that drive discovery (like n8n's template library)
+1. **Free tier as the growth engine**: Generous free tier (3 plugins, 100 AI actions/mo) lets developers experience the unified command center without friction
+2. **Viral plugin sharing**: Community plugins and cross-plugin automation templates drive discovery
 3. **Plugin ecosystem as distribution**: Each community-built plugin brings the plugin author's audience
-4. **Bottom-up enterprise adoption**: Individual developers adopt DevRig, then bring it to their teams
+4. **Bottom-up enterprise adoption**: Individual developers adopt DevRig for their personal inbox, then bring it to their teams for shared views
 
 **Secondary Channels**:
 
 | Channel | Expected Contribution | Strategy |
 |---|---|---|
-| Content marketing (blog, tutorials) | 25% of signups | SEO-optimized guides: "How to automate Linear tickets with AI" |
+| Content marketing (blog, tutorials) | 25% of signups | SEO-optimized guides: "How I replaced 6 developer tool tabs with one AI inbox" |
 | Community (Discord, GitHub) | 20% of signups | Active community with plugin showcases, flow sharing |
 | Launch platforms (Product Hunt, HN) | 15% of initial signups | Coordinated multi-platform launch campaign |
 | Social/developer influencers | 15% of signups | Build-in-public, Twitter/X dev community |
@@ -267,9 +274,9 @@ Based on the success patterns of Linear, Cursor, Raycast, and n8n:
 
 **Pre-Launch (Month -2 to 0)**:
 - Build in public on Twitter/X (following Linear's playbook: 10K waitlist before launch)
-- Private beta with 50-100 hand-picked developers (targeting teams using Linear + Claude Code)
-- Create 10 high-quality demo flows (Linear->Claude Code, GitHub->AI Review, etc.)
-- Write 5 "deep dive" blog posts showing the product concept and philosophy
+- Private beta with 50-100 hand-picked developers (targeting teams using Linear + GitHub + Gmail daily)
+- Create demo videos showing the unified inbox in action (Gmail + Linear + GitHub + Sentry in one stream)
+- Write 5 "deep dive" blog posts showing the command center concept and philosophy
 
 **Launch Day Strategy**:
 - **Product Hunt launch** on a Tuesday-Thursday (historically best days)
@@ -288,20 +295,20 @@ Based on the success patterns of Linear, Cursor, Raycast, and n8n:
 ### 5.3 Content Marketing Strategy
 
 **Content Pillars**:
-1. **"AI Workflow Recipes"**: Step-by-step guides for specific automations (SEO plays)
-   - "Automate code reviews with Claude Code and GitHub"
-   - "Turn Linear tickets into drafted PRs in 60 seconds"
-   - "Build an AI-powered on-call triage system"
+1. **"Developer Command Center Playbook"**: Step-by-step guides for unified workflow management (SEO plays)
+   - "How I replaced 6 tabs with one AI-powered inbox"
+   - "AI triage for developers: classify every notification in seconds"
+   - "Build cross-tool automations: Sentry alert -> Linear ticket -> Slack notification"
 
 2. **"Building DevRig" (Build in Public)**:
    - Technical architecture decisions
    - Revenue milestones shared transparently
    - Design process and UX decisions
 
-3. **"Developer Automation Landscape"**:
-   - Comparison articles (DevRig vs n8n for developers)
+3. **"Developer Productivity Landscape"**:
+   - Comparison articles (DevRig vs Superhuman for developers, DevRig vs Raycast)
    - Market analysis and trend pieces
-   - Thought leadership on AI-native development
+   - Thought leadership on the unified developer command center category
 
 **Distribution**:
 - 41% traffic from social/community (Reddit is the top channel for dev tools)
@@ -314,9 +321,9 @@ Based on the success patterns of Linear, Cursor, Raycast, and n8n:
 Following Raycast's model (20,000+ developer community building extensions):
 
 1. **Plugin Developer Program**: Early access, documentation, showcase opportunities
-2. **Flow Template Gallery**: Community-contributed automation templates (like n8n's template library)
-3. **Discord Community**: Channels for flow-sharing, plugin development, feature requests
-4. **Monthly Showcase**: Highlight best community flows and plugins
+2. **Flow Template Gallery**: Community-contributed cross-plugin automation templates
+3. **Discord Community**: Channels for plugin development, inbox workflows, feature requests
+4. **Monthly Showcase**: Highlight best community plugins and automation flows
 5. **Extension Fund**: Small grants for high-quality plugin development (like Raycast's model)
 
 ---
@@ -325,26 +332,30 @@ Following Raycast's model (20,000+ developer community building extensions):
 
 ### 6.1 Phase 1: Build & Launch (Months 1-3)
 
-**Month 1: Foundation**
-- Core product: Visual flow builder with 5 integrations (Linear, GitHub, Slack, Claude Code, Webhook)
-- Desktop app (Mac first, using Tauri for performance - 70% smaller bundle vs Electron)
-- Plugin SDK v0.1 (TypeScript-based)
+**Month 1: Foundation -- Plugin SDK + Unified Inbox**
+- Plugin SDK v0.1 (TypeScript-based) -- the core architecture; everything is a plugin
+- First three plugins: Gmail, GitHub, Linear (highest-frequency developer tools)
+- Unified inbox UI: single stream of emails, notifications, issues, PRs with AI classification
+- Desktop app (Mac first, Electron)
+- AI intelligence layer: classify and prioritize incoming items across all plugins
 - Waitlist page with email capture
 - Begin building in public (Twitter/X)
 
 **Month 2: Private Beta**
 - Invite 50-100 developers from waitlist
-- Add 5 more integrations (Jira, GitLab, Discord, Notion, VS Code)
+- Add plugins: Slack, Jira, Sentry (6 total)
+- AI actions: summarize, draft replies, triage across all connected tools
+- Visual flow builder v0.1 for cross-plugin automations (power user feature)
 - Iterate on UX based on daily feedback
-- Plugin marketplace scaffolding
 - Content: 3 blog posts, 2 video demos
 
 **Month 3: Public Launch**
 - Product Hunt + Hacker News launch
 - Free tier available to all
 - Pro tier ($19/mo) available
-- 15+ integrations
+- 10+ plugins (add Datadog, GitLab, Discord, Notion)
 - Plugin SDK v1.0
+- Plugin marketplace scaffolding
 
 **Month 3 Targets**:
 | Metric | Target |
@@ -358,17 +369,17 @@ Following Raycast's model (20,000+ developer community building extensions):
 ### 6.2 Phase 2: First 100 Paying Users (Months 4-6)
 
 **Month 4: Product-Market Fit Refinement**
-- Analyze usage data from free users: which flows are most popular?
-- Double down on top 3 use cases
+- Analyze usage data from free users: which plugins are most connected? Which AI actions are most used?
+- Double down on top 3 plugin integrations
 - Ship Windows beta
-- Add 10 more integrations (total: 25+)
+- Add 10 more plugins (total: 20+)
 - Hire first community manager / developer advocate
 
 **Month 5: Growth Acceleration**
-- Launch Team tier ($39/user/mo)
+- Launch Team tier ($39/user/mo) with shared inbox views
 - Plugin marketplace goes live with first 20 community plugins
-- Integration partnership with Linear (co-marketing, deep integration)
-- Weekly "DevRig Recipes" newsletter
+- Integration partnership with Linear (co-marketing, deep plugin integration)
+- Weekly "DevRig Command Center" newsletter
 - Begin SEO content machine (2 posts/week)
 
 **Month 6: Scaling**
@@ -457,41 +468,41 @@ Assumptions:
 
 | Risk | Probability | Impact | Severity | Mitigation |
 |---|---|---|---|---|
-| **Cursor/Copilot adds workflow features** | High (60%) | High | Critical | Move fast; build plugin ecosystem moat; deep Linear/GitHub integration they will not match |
-| **n8n adds AI coding agent** | Medium (40%) | Medium | High | Focus on desktop-native + developer UX; n8n's DNA is business automation, not developer tooling |
+| **Cursor/Copilot adds unified inbox** | Medium (40%) | High | Critical | Move fast; build plugin ecosystem moat; Cursor's DNA is IDE, not tool aggregation; DevRig's unified inbox is the entire product |
+| **Superhuman expands beyond email** | Medium (40%) | Medium | High | Focus on developer-specific tools (Linear, GitHub, Sentry) that Superhuman lacks domain expertise in; plugin ecosystem creates breadth they cannot match |
 | **AI API costs make unit economics negative** | Medium (35%) | High | High | Usage-based pricing tiers; negotiate volume discounts with Anthropic; allow user-provided API keys |
-| **Claude Code API changes/restrictions** | Medium (30%) | High | High | Multi-model support (OpenAI, local models); abstract AI layer so model is swappable |
+| **Claude Code API changes/restrictions** | Medium (30%) | High | High | Multi-model support (Claude first, then OpenAI, Gemini, local models); abstract AI layer so model is swappable |
 | **Low free-to-paid conversion** | Medium (40%) | Medium | Medium | Strong upgrade triggers (usage limits); team features behind paywall; A/B test pricing |
-| **Desktop distribution challenges** | Low (20%) | Medium | Medium | Auto-update system; Tauri reduces install size; web companion for onboarding |
+| **Desktop distribution challenges** | Low (20%) | Medium | Medium | Auto-update system; Electron ecosystem maturity; web companion for onboarding |
 | **Security concerns (AI + code access)** | Medium (35%) | High | High | Local-first execution; SOC 2 compliance; transparent data handling; on-prem option |
 | **Plugin ecosystem fails to attract developers** | Medium (40%) | Medium | Medium | Seed ecosystem with own plugins; developer grants; revenue sharing; great SDK/docs |
 | **Market timing (too early or too late)** | Low (25%) | High | Medium | Launch lean; iterate based on demand signals; pivot capability built in |
 
 ### 7.2 Detailed Mitigation Strategies
 
-**Risk: Major Competitors Add Workflow Features**
+**Risk: Major Competitors Add Unified Inbox / Tool Aggregation**
 
 This is the highest-probability, highest-impact risk. Mitigation:
 - **Speed**: Launch an MVP in 3 months. Every day without the product in market increases this risk.
-- **Depth**: Go deeper on the automation + AI intersection than a competitor adding it as a feature. DevRig's entire product is this; for Cursor, it would be a side feature.
-- **Ecosystem**: A plugin ecosystem with 100+ community plugins creates switching costs. Cursor adding a basic workflow feature will not replicate this.
-- **Community**: Build a passionate community around "AI workflow automation" as a category. Category creators have first-mover advantage in mindshare.
+- **Depth**: Go deeper on unified developer tool aggregation + AI intelligence than a competitor adding it as a feature. DevRig's entire product is this; for Cursor, it would be a side feature; for Superhuman, developer tools are outside their domain.
+- **Ecosystem**: A plugin ecosystem with 100+ community plugins creates switching costs. No single competitor can replicate the breadth of a community-driven plugin marketplace.
+- **Community**: Build a passionate community around "AI-powered developer command center" as a category. Category creators have first-mover advantage in mindshare.
 
 **Risk: AI API Costs**
 
-Claude Code API calls are not free. At scale, this could erode margins.
-- **Tier-based limits**: Free tier gets 50 AI actions/month, Pro gets 500, Team gets 5,000
-- **User-provided API keys**: Let users bring their own Anthropic/OpenAI keys (reduces cost to zero for DevRig)
-- **Local model support**: Integrate with Ollama/local LLMs for users who want free unlimited AI actions (with quality tradeoff)
-- **Caching**: Cache AI analysis results for identical/similar inputs
+AI API calls (classification, summarization, drafting) are not free. At scale, this could erode margins.
+- **Tier-based limits**: Free tier gets 100 AI actions/month, Pro gets 500, Team gets 2,000/user
+- **User-provided API keys**: Let users bring their own Anthropic/OpenAI/Google keys (reduces cost to zero for DevRig)
+- **Multi-model flexibility**: Claude first, then OpenAI, Gemini, and local models via Ollama for users who want free unlimited AI actions (with quality tradeoff)
+- **Caching**: Cache AI classification and summarization results for identical/similar inputs
 
 **Risk: Low Conversion Rate**
 
 Developer tools typically see 1-3% free-to-paid conversion.
-- **Usage-based friction**: Free tier is genuinely useful but has clear limits (100 runs/month)
-- **Team features**: Collaboration features (shared flows, team templates) only in paid tiers
-- **AI quality tier**: Better AI models (Claude Opus vs Haiku) only in paid tiers
-- **Time-limited trials**: 14-day Pro trial for all new users to experience full value
+- **Plugin limits**: Free tier is genuinely useful with 3 plugins but the urge to connect more tools drives upgrades
+- **AI action limits**: 100 AI actions/month creates a natural upgrade trigger for daily users
+- **Team features**: Shared inbox views, team flows, and SSO only in paid tiers
+- **Time-limited trials**: 14-day Pro trial for all new users to experience full value across unlimited plugins
 
 ---
 
@@ -501,7 +512,7 @@ Developer tools typically see 1-3% free-to-paid conversion.
 
 | Metric | Definition | Target (M6) | Target (M12) | Benchmark Source |
 |---|---|---|---|---|
-| **Weekly Active Flows** | Flows executed at least once in past 7 days | 5,000 | 50,000 | Leading indicator of value delivery |
+| **Weekly Active Users** | Users who triaged at least one inbox item in past 7 days | 5,000 | 50,000 | Leading indicator of value delivery |
 | **ARR** | Annual recurring revenue | $120K | $1M+ | Primary business metric |
 | **Net Revenue Retention** | Revenue from existing customers vs prior period | 105% | 115%+ | Best-in-class SaaS: 120%+ |
 
@@ -510,7 +521,7 @@ Developer tools typically see 1-3% free-to-paid conversion.
 | Metric | Target | Benchmark |
 |---|---|---|
 | Monthly free signups | 5,000-10,000 | Raycast grew from 130 to 11,000 DAU in 12 months |
-| Signup-to-activation rate | 40%+ | (Create first flow within 24 hours) |
+| Signup-to-activation rate | 40%+ | (Connect first plugin within 24 hours) |
 | Free-to-paid conversion | 3-5% | Developer tools average: 1-3%; top quartile: 5-8% |
 | CAC (organic/PLG) | <$50 | SaaS average: $702; PLG target: <$100 |
 | CAC (paid channels) | <$200 | Maintain 3:1 LTV:CAC ratio |
@@ -520,10 +531,10 @@ Developer tools typically see 1-3% free-to-paid conversion.
 | Metric | Target | Rationale |
 |---|---|---|
 | DAU/MAU ratio | 30%+ | Indicates daily habit formation |
-| Flows per user | 5+ active | More flows = higher switching cost |
+| Connected plugins per user | 3+ | More plugins = higher switching cost |
 | AI actions per user/week | 20+ | Core value delivery metric |
-| Plugin installs per user | 3+ | Ecosystem engagement |
-| Time-to-first-flow | <10 minutes | Onboarding success metric |
+| Items triaged per user/day | 10+ | Inbox engagement and value delivery |
+| Time-to-first-plugin | <5 minutes | Onboarding success metric |
 
 ### 8.4 Retention & Monetization Metrics
 
@@ -592,19 +603,9 @@ Developer tools typically see 1-3% free-to-paid conversion.
 
 ## Appendix B: Technology Recommendations
 
-### Desktop Framework: Tauri (Recommended over Electron)
+### Desktop Framework: Electron
 
-| Factor | Tauri | Electron |
-|---|---|---|
-| Install size | ~8MB | ~120MB |
-| Memory usage | 30-40MB idle | 100-300MB+ |
-| Cold start time | <0.5s | 1-2s |
-| Backend language | Rust (performance) | Node.js (ecosystem) |
-| Adoption trend | +35% YoY | Stable |
-
-**Recommendation**: Use Tauri 2.0 for the desktop shell. The performance advantages (70% smaller, 70% faster startup) directly support DevRig's value proposition of a fast, lightweight automation tool. The Rust backend also enables efficient local AI model execution in the future.
-
-**Counterpoint**: If the team has stronger Node.js/TypeScript expertise, Electron remains viable (Cursor, VS Code, Slack all use it successfully). The ecosystem advantage is significant.
+DevRig uses Electron 34+ (Chromium 132+, Node.js 22+) as the desktop framework. Electron provides the broadest ecosystem support, mature tooling (electron-vite, Electron Forge), and proven success at scale (Cursor, VS Code, Slack, Linear). Performance budgets (cold start < 1.5s, idle memory < 150MB) are enforced at the CI level to keep the experience fast.
 
 ### Plugin Architecture
 
@@ -620,38 +621,46 @@ Developer tools typically see 1-3% free-to-paid conversion.
 
 ### Why DevRig Wins
 
-**1. AI-Native Architecture (Not a Bolt-On)**
+**1. Unified Developer Command Center (No One Else Does This)**
 
-Unlike n8n adding "AI nodes" or Zapier adding "AI steps," DevRig is designed from the ground up with AI as a first-class primitive:
-- AI actions understand code context (repo structure, language, frameworks)
-- Flows can branch based on AI analysis results
-- AI can generate and modify flows themselves (meta-automation)
-- Multi-step AI reasoning within a single flow (chain-of-thought across nodes)
+No product unifies a developer's entire toolchain -- email, issues, PRs, alerts, messages -- into a single intelligent hub:
+- AI-powered unified inbox across all connected plugins
+- AI classifies, prioritizes, and surfaces what matters most
+- AI drafts replies, summaries, and actions across every tool
+- Multi-model support: Claude first, then OpenAI, Gemini, and local models
 
-**2. Desktop-Native Advantages**
+**2. Plugin-First Architecture**
+
+Every integration is a first-class plugin, not a bolt-on:
+- Community-built plugins extend DevRig to any tool or service
+- Plugin developers become advocates and bring their audiences
+- Each plugin increases DevRig's value for all users (network effect)
+- Switching cost increases with plugin dependency
+- Revenue sharing incentivizes quality plugin development
+- Raycast's success (1,500+ extensions, 20K developers) validates the model
+
+**3. Desktop-Native Advantages**
 
 - Access to local filesystem (read/write repos without cloud sync)
 - Access to local CLI tools (npm, git, docker, kubectl)
 - Access to local network services (databases, APIs behind VPN)
 - Lower latency (no round-trip to cloud for local operations)
-- Works offline (non-AI flows execute without internet)
-- Privacy: code never leaves the developer's machine (unless explicitly configured)
+- Works offline (non-AI features function without internet)
+- Privacy: data stays on the developer's machine (unless explicitly configured)
 
-**3. Plugin Ecosystem as Moat**
+**4. Cross-Plugin Automations for Power Users**
 
-Raycast's success (1,500+ extensions, 20K developers) proves the model:
-- Community-built plugins extend DevRig to any tool or service
-- Plugin developers become advocates and bring their audiences
-- Each plugin increases DevRig's value for all users
-- Switching cost increases with plugin dependency
-- Revenue sharing incentivizes quality plugin development
+The visual flow builder enables programmable automation across plugins:
+- "When Sentry fires a P1 -> AI summarizes the trace -> create a Linear ticket -> notify Slack on-call channel"
+- "When a PR is merged -> AI drafts a changelog entry -> update the Notion doc -> send a summary email"
+- Flows can branch based on AI analysis results
+- AI can generate and modify flows themselves (meta-automation)
 
-**4. Developer-First Design Language**
+**5. Developer-First Design Language**
 
 Linear proved that opinionated, beautifully designed tools win developer hearts:
-- Keyboard-first UX (like Linear, Raycast)
-- Code-alongside-visual editing (write TypeScript or use drag-and-drop)
-- Git-based flow versioning (flows are code, stored in repos)
+- Keyboard-first UX (like Linear, Superhuman, Raycast)
+- Unified inbox with fast triage actions (archive, snooze, assign, reply)
 - Dark mode, minimal chrome, fast interactions
 - No enterprise bloat in the core experience
 
@@ -716,9 +725,8 @@ Linear proved that opinionated, beautifully designed tools win developer hearts:
 - [Best AI Coding Agents 2026 - Faros AI](https://www.faros.ai/blog/best-ai-coding-agents-2026)
 
 ### Desktop Technology
-- [Electron vs Tauri - DoltHub](https://www.dolthub.com/blog/2025-11-13-electron-vs-tauri/)
-- [Tauri vs Electron 2025 - RaftLabs](https://www.raftlabs.com/blog/tauri-vs-electron-pros-cons/)
-- [Tauri vs Electron Performance - Hopp](https://www.gethopp.app/blog/tauri-vs-electron)
+- [Electron Documentation](https://www.electronjs.org/docs/latest)
+- [electron-vite Documentation](https://electron-vite.org/)
 
 ---
 

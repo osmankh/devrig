@@ -4,6 +4,9 @@ import { temporal } from 'zundo'
 import type { Flow, FlowNode, FlowEdge } from './flow.types'
 import * as api from '../api/flow-ipc'
 
+// Auto-save timer
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+
 interface FlowState {
   // Data
   flows: Flow[]
@@ -50,6 +53,12 @@ export const useFlowStore = create<FlowState>()(
       },
 
       loadFlow: async (id) => {
+        // Cancel any pending auto-save for the previous flow
+        if (autoSaveTimer) {
+          clearTimeout(autoSaveTimer)
+          autoSaveTimer = null
+        }
+
         set((s) => {
           s.isLoading = true
         })
@@ -191,3 +200,13 @@ export const useFlowStore = create<FlowState>()(
     }
   )
 )
+
+// Auto-save subscription
+useFlowStore.subscribe((state, prevState) => {
+  if (state.isDirty && !prevState.isDirty) {
+    if (autoSaveTimer) clearTimeout(autoSaveTimer)
+    autoSaveTimer = setTimeout(() => {
+      useFlowStore.getState().saveFlow()
+    }, 2000)
+  }
+})

@@ -6,6 +6,7 @@ import { Toaster } from '@shared/ui'
 import { TooltipProvider } from '@shared/ui/tooltip'
 import { useUIStore } from './stores/ui-store'
 import { loadTier1, loadTier2 } from './data-loader'
+import { initExecutionSubscriptions } from '@entities/execution'
 
 // Apply bootstrap cache before React renders
 loadTier1()
@@ -15,6 +16,7 @@ export function App() {
 
   useEffect(() => {
     loadTier2()
+    initExecutionSubscriptions()
   }, [])
 
   return (

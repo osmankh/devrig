@@ -62,6 +62,17 @@ Every metric listed below is a hard budget. If any metric regresses past its thr
 | Total renderer (all lazy chunks) | < 2MB gzipped | > 3MB gzipped |
 | Native modules (unpacked) | < 15MB | > 25MB |
 
+### Plugin and Inbox Performance Budgets
+
+| Metric | Target | Failure Threshold | Measurement |
+|---|---|---|---|
+| Inbox render (1000 items) | < 16ms per frame | > 20ms per frame | `requestAnimationFrame` delta during continuous scroll |
+| Plugin sync cycle (all plugins) | < 30s | > 60s | Wall time from sync start to all plugins complete |
+| AI classification (per item) | < 3s | > 5s | Background, non-blocking; measured from enqueue to result cached |
+| Plugin isolate creation | < 100ms | > 200ms | Time from `createIsolate()` to ready state |
+
+These budgets apply to plugin-first and AI-augmented operations. AI classification and plugin sync are background operations that must never block the UI thread, but their completion time is budgeted to ensure the inbox converges to a fully classified state within a reasonable window.
+
 ---
 
 ## 2. Startup Optimization
@@ -165,6 +176,8 @@ app.on('ready', async () => {
   }, 2000); // Well after the user sees the interactive UI
 });
 ```
+
+**Plugin loading strategy:** Plugin sandboxes are lazy-loaded after startup, never during the critical 1.5s cold-start window. First-party plugins (Linear, GitHub, etc.) are bundled and pre-compiled at build time for faster initialization. Plugin V8 isolates are pooled and recycled across executions to reduce memory overhead and amortize the cost of isolate creation. The `initPlugins()` call above only registers plugin metadata; actual isolate creation is deferred to the first invocation of each plugin.
 
 ### 2.4 Tiered Data Loading (Linear Pattern)
 
@@ -433,6 +446,8 @@ Key implementation details:
 - Set `overscan: 10` to prevent visible blank space during fast scrolling.
 - Use `measureElement` for variable-height rows; use `estimateSize` alone for fixed-height rows (faster).
 - The parent container must have a fixed height and `overflow: auto`.
+
+**Unified inbox rendering:** The unified inbox uses TanStack Virtual to render 1000+ items at 60fps. Inbox item components are memoized so that only the visible items plus the overscan buffer are rendered to the DOM. Plugin-provided views (e.g., Linear issue detail, GitHub PR detail) are lazy-loaded when the user selects an inbox item, not when the item scrolls into view. AI classification badges and priority summaries render from cached local data stored in SQLite, so no network calls occur during scroll. This ensures the inbox scroll performance is identical to a static list regardless of how many plugins contribute items.
 
 ### 3.3 CSS Containment
 
@@ -753,7 +768,19 @@ CREATE INDEX idx_sync_queue_status
 -- Plugin data: fast lookup by plugin and key
 CREATE INDEX idx_plugin_data_lookup
   ON plugin_data (plugin_id, key);
+
+-- Unified inbox: main feed sorted by priority and recency
+CREATE INDEX idx_inbox_items_status
+  ON inbox_items (status, priority DESC, created_at DESC);
+
+-- Unified inbox: plugin-scoped queries
+CREATE INDEX idx_inbox_items_plugin
+  ON inbox_items (plugin_id, status, created_at DESC);
 ```
+
+**Inbox query pagination:** Inbox queries use cursor-based pagination (keyed on `(priority, created_at, id)`) instead of `OFFSET` to maintain consistent performance regardless of page depth. OFFSET-based pagination degrades linearly as the offset grows because SQLite must scan and discard rows. Cursor-based pagination uses the index directly, keeping every page fetch under 1ms.
+
+**Batch sync inserts:** Plugin data sync uses transactional batch inserts for incoming items. As documented in section 4.3, wrapping N inserts in a single transaction reduces the cost from N fsyncs to 1 fsync, achieving roughly 100x improvement. Plugin sync batches default to 500 items per transaction.
 
 **Index verification rule:** Run `EXPLAIN QUERY PLAN` for every query in the hot path. If the output shows `SCAN TABLE` instead of `SEARCH TABLE USING INDEX`, add a covering index.
 
@@ -1008,6 +1035,63 @@ function resolveConflict(local: SyncRecord, server: SyncDelta): 'keep-local' | '
 
   // Local change is newer - it will be pushed in the next sync cycle
   return 'keep-local';
+}
+```
+
+### 5.6 AI API Latency Management
+
+AI operations (classify, summarize, draft) are inherently slow, typically 1-5 seconds per API call. This latency is incompatible with the sub-50ms interaction budget, so AI work must be fully decoupled from the UI interaction path.
+
+**Fire-and-forget background processing:** When new inbox items arrive from plugin sync, AI classification and summarization requests are enqueued to a background task queue. The items appear in the inbox immediately with a "classifying..." skeleton state. The user can scroll, select, and interact with items before AI processing completes.
+
+**Optimistic store updates:** When AI results return, they update the inbox items in-place via the Zustand store. The UI transitions from the skeleton to the final classification badge and summary without any full-list re-render, because only the affected item's component updates.
+
+**Streaming responses for drafts:** Draft generation (AI-composed replies) uses streaming responses displayed character-by-character in the compose panel. This provides immediate feedback even though the full response takes 2-5 seconds to generate. The streaming connection runs in a dedicated async handler that does not block the renderer main thread.
+
+**Local model fallback:** For offline scenarios or when low-latency classification is required, a lightweight local model provides fast classification at lower quality. The local model runs in a worker thread and returns results in under 100ms. When the device comes back online, items classified locally are re-classified by the cloud model in the background, and results are silently upgraded if they differ.
+
+```ts
+// services/ai-queue.ts
+interface AITask {
+  type: 'classify' | 'summarize' | 'draft';
+  itemId: string;
+  content: string;
+  priority: number; // higher = process first
+}
+
+class AITaskQueue {
+  private queue: AITask[] = [];
+  private processing = false;
+  private concurrency = 3; // max parallel API calls
+
+  enqueue(task: AITask): void {
+    this.queue.push(task);
+    this.queue.sort((a, b) => b.priority - a.priority);
+    this.processNext();
+  }
+
+  private async processNext(): Promise<void> {
+    if (this.processing || this.queue.length === 0) return;
+    this.processing = true;
+
+    // Process up to `concurrency` tasks in parallel
+    const batch = this.queue.splice(0, this.concurrency);
+    await Promise.allSettled(
+      batch.map(async (task) => {
+        const result = await this.executeAITask(task);
+        // Update inbox item in-place (optimistic store update)
+        inboxStore.getState().updateItemAI(task.itemId, result);
+        // Cache result in SQLite for future reads
+        await ipc.invoke('db:inbox:updateAI', {
+          id: task.itemId,
+          ...result,
+        });
+      })
+    );
+
+    this.processing = false;
+    if (this.queue.length > 0) this.processNext();
+  }
 }
 ```
 
@@ -1483,7 +1567,17 @@ function onWorkflowClosed(): void {
 }
 ```
 
-### 8.7 Memory Leak Detection in Development
+### 8.7 Plugin and Inbox Memory Budgets
+
+**Plugin isolate memory:** Each plugin runs in an isolated-vm V8 isolate with a hard 128MB memory limit. When the limit is reached, the isolate is terminated and restarted. Pooled isolates share a common memory allocation strategy: idle isolates are suspended and their heap snapshots are stored, then restored on demand. This keeps the total plugin memory footprint bounded regardless of how many plugins are installed.
+
+**Inbox item memory:** The unified inbox stores only visible items plus lightweight metadata (id, title, status, priority, plugin source) in the Zustand store. Full item bodies, AI summaries, and attachment data are loaded on demand from SQLite when the user selects an item. This prevents the inbox from consuming unbounded memory as the item count grows.
+
+**AI response caching:** AI classifications (priority, category, sentiment) and summaries are computed once and cached in SQLite alongside the inbox item. Subsequent views read from the cache, not from the AI API. Cache invalidation occurs only when the source item is updated by the plugin sync. This eliminates redundant API calls and keeps AI-related memory usage constant per item.
+
+**Plugin data sync memory:** Plugin data sync runs in the background with memory-bounded batch sizes (default: 500 items per batch). Each batch is processed and committed to SQLite before the next batch is fetched, preventing unbounded memory growth during large syncs. Back-pressure is applied if the sync queue grows beyond 10,000 pending items.
+
+### 8.8 Memory Leak Detection in Development
 
 Use `memlab` from Meta for automated heap analysis during development and CI:
 
@@ -2239,6 +2333,7 @@ Use this checklist before every release:
 - [ ] Window shell renders before data loads
 - [ ] `Menu.setApplicationMenu(null)` called before ready event
 - [ ] Tiered data loading (bootstrap -> partial -> full)
+- [ ] Plugin sandboxes lazy-loaded (not during startup critical path)
 
 ### Rendering
 - [ ] React Compiler enabled and all components compiling
@@ -2248,6 +2343,9 @@ Use this checklist before every release:
 - [ ] `content-visibility: auto` on scrollable content items
 - [ ] No layout thrashing (reads batched before writes)
 - [ ] Flow builder maintains < 16ms frame time with 100+ nodes
+- [ ] Unified inbox maintains 60fps with 1000+ items (TanStack Virtual)
+- [ ] Plugin views lazy-loaded on selection, not on scroll
+- [ ] AI badges render from cached local data (no network during scroll)
 
 ### Database
 - [ ] WAL mode enabled
@@ -2257,6 +2355,8 @@ Use this checklist before every release:
 - [ ] All hot-path queries use indexes (verified via EXPLAIN QUERY PLAN)
 - [ ] Batch writes wrapped in transactions
 - [ ] Prepared statement cache active
+- [ ] Inbox queries use cursor-based pagination (not OFFSET)
+- [ ] Plugin sync uses transactional batch inserts
 
 ### Memory
 - [ ] Idle memory under 150MB
@@ -2265,6 +2365,9 @@ Use this checklist before every release:
 - [ ] WeakRef used for caches
 - [ ] GC hints after major state transitions
 - [ ] memlab leak tests passing in CI
+- [ ] Plugin isolates limited to 128MB each, pooled and recycled
+- [ ] Inbox items load full body on demand (not preloaded in memory)
+- [ ] AI classifications cached in SQLite, not re-computed per view
 
 ### Monitoring
 - [ ] Performance marks on all critical path milestones

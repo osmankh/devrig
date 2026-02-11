@@ -56,3 +56,10 @@ body {
 ::selection {
   background-color: var(--color-accent-muted);
 }
+
+/* Edge animation */
+@keyframes dashdraw {
+  to {
+    stroke-dashoffset: -10;
+  }
+}

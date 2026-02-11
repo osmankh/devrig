@@ -121,6 +121,21 @@ export function registerDbHandlers(repos: Repos): void {
   })
 
   // Node handlers
+  secureHandle('db:node:create', (_e, data: unknown) => {
+    const parsed = z
+      .object({
+        workflowId: z.string(),
+        type: z.string(),
+        label: z.string().optional(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        config: z.string().optional()
+      })
+      .safeParse(data)
+    if (!parsed.success) return err('Invalid node data', 'VALIDATION')
+    return ok(repos.node.create(parsed.data))
+  })
+
   secureHandle('db:node:update', (_e, id: unknown, data: unknown) => {
     const idParsed = z.string().safeParse(id)
     const dataParsed = z
@@ -137,6 +152,12 @@ export function registerDbHandlers(repos: Repos): void {
     const result = repos.node.update(idParsed.data, dataParsed.data)
     if (!result) return err('Node not found', 'NOT_FOUND')
     return ok(result)
+  })
+
+  secureHandle('db:node:delete', (_e, id: unknown) => {
+    const parsed = z.string().safeParse(id)
+    if (!parsed.success) return err('Invalid node id', 'VALIDATION')
+    return ok(repos.node.delete(parsed.data))
   })
 
   secureHandle('db:node:batchCreate', (_e, nodes: unknown) => {
@@ -174,6 +195,33 @@ export function registerDbHandlers(repos: Repos): void {
   })
 
   // Edge handlers
+  secureHandle('db:edge:create', (_e, data: unknown) => {
+    const parsed = z
+      .object({
+        workflowId: z.string(),
+        sourceNodeId: z.string(),
+        targetNodeId: z.string(),
+        sourceHandle: z.string().optional(),
+        targetHandle: z.string().optional(),
+        label: z.string().optional()
+      })
+      .safeParse(data)
+    if (!parsed.success) return err('Invalid edge data', 'VALIDATION')
+    return ok(repos.edge.create(parsed.data))
+  })
+
+  secureHandle('db:edge:delete', (_e, id: unknown) => {
+    const parsed = z.string().safeParse(id)
+    if (!parsed.success) return err('Invalid edge id', 'VALIDATION')
+    return ok(repos.edge.delete(parsed.data))
+  })
+
+  secureHandle('db:edge:deleteByWorkflow', (_e, workflowId: unknown) => {
+    const parsed = z.string().safeParse(workflowId)
+    if (!parsed.success) return err('Invalid workflow id', 'VALIDATION')
+    return ok(repos.edge.deleteByWorkflow(parsed.data))
+  })
+
   secureHandle('db:edge:batchCreate', (_e, edges: unknown) => {
     const parsed = z
       .array(
@@ -198,6 +246,51 @@ export function registerDbHandlers(repos: Repos): void {
     const l = typeof limit === 'number' ? limit : 50
     const o = typeof offset === 'number' ? offset : 0
     return ok(repos.execution.list(parsed.data, l, o))
+  })
+
+  secureHandle('db:execution:create', (_e, data: unknown) => {
+    const parsed = z
+      .object({
+        workflowId: z.string(),
+        triggerType: z.string(),
+        status: z.string().optional()
+      })
+      .safeParse(data)
+    if (!parsed.success) return err('Invalid execution data', 'VALIDATION')
+    return ok(repos.execution.create(parsed.data))
+  })
+
+  secureHandle('db:execution:update', (_e, id: unknown, data: unknown) => {
+    const idParsed = z.string().safeParse(id)
+    const dataParsed = z
+      .object({
+        status: z.string().optional(),
+        startedAt: z.number().optional(),
+        completedAt: z.number().optional(),
+        error: z.string().optional()
+      })
+      .safeParse(data)
+    if (!idParsed.success || !dataParsed.success)
+      return err('Invalid data', 'VALIDATION')
+    const result = repos.execution.update(idParsed.data, dataParsed.data)
+    if (!result) return err('Execution not found', 'NOT_FOUND')
+    return ok(result)
+  })
+
+  secureHandle('db:execution:get', (_e, id: unknown) => {
+    const parsed = z.string().safeParse(id)
+    if (!parsed.success) return err('Invalid execution id', 'VALIDATION')
+    const result = repos.execution.get(parsed.data)
+    if (!result) return err('Execution not found', 'NOT_FOUND')
+    return ok(result)
+  })
+
+  secureHandle('db:execution:getWithSteps', (_e, id: unknown) => {
+    const parsed = z.string().safeParse(id)
+    if (!parsed.success) return err('Invalid execution id', 'VALIDATION')
+    const result = repos.execution.getWithSteps(parsed.data)
+    if (!result) return err('Execution not found', 'NOT_FOUND')
+    return ok(result)
   })
 
   // Settings handlers

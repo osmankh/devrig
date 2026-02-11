@@ -71,6 +71,13 @@ export class EdgeRepository {
     return result.changes > 0
   }
 
+  deleteByWorkflow(workflowId: string): boolean {
+    const result = this.stmts
+      .prepare('DELETE FROM flow_edges WHERE workflow_id = ?')
+      .run(workflowId)
+    return result.changes > 0
+  }
+
   batchCreate(
     edges: Array<{
       workflowId: string

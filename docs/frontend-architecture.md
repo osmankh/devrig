@@ -1,8 +1,8 @@
 # DevRig Frontend Architecture
 
-**Document Version**: 1.0
-**Date**: 2026-02-10
-**Purpose**: Production-grade frontend architecture specification for DevRig, an Electron desktop application for AI-native developer workflow automation. Designed to match Linear's UI speed and polish.
+**Document Version**: 2.0
+**Date**: 2026-02-11
+**Purpose**: Production-grade frontend architecture specification for DevRig, an Electron desktop application serving as an AI-powered developer command center. Designed to match Linear's UI speed and polish.
 
 ---
 
@@ -10,7 +10,7 @@
 
 1. [Executive Summary](#1-executive-summary)
 2. [UI Framework and Library Choices](#2-ui-framework-and-library-choices)
-3. [Component Architecture](#3-component-architecture)
+3. [Component Architecture](#3-component-architecture) (incl. 3.3 Plugin View System)
 4. [Visual Flow Builder](#4-visual-flow-builder)
 5. [State Management Architecture](#5-state-management-architecture)
 6. [Design System Specification](#6-design-system-specification)
@@ -25,7 +25,11 @@
 
 ## 1. Executive Summary
 
-DevRig is a commercial Electron desktop application that provides a visual, AI-native workflow automation tool for developers. The UI must deliver the same instantaneous feel that Linear achieves -- every click, every transition, every state change must feel immediate.
+DevRig is a commercial Electron desktop application that serves as an AI-powered developer command center. The primary UI is a unified inbox/dashboard that aggregates and displays priority-sorted items from all connected plugins -- emails, tickets, pull requests, alerts, and any other developer-relevant signals -- into a single, actionable feed. AI classification and drafting are built into the core experience: items are automatically triaged, and AI-generated responses or actions are surfaced alongside each item.
+
+The visual flow builder, previously the centerpiece of the application, becomes a secondary power-user feature for creating custom automation workflows. The inbox is the surface most users interact with daily; the flow builder is where power users define the rules and automations that feed into and act upon inbox items.
+
+The UI must deliver the same instantaneous feel that Linear achieves -- every click, every transition, every state change must feel immediate.
 
 ### What Makes Linear Fast (And How We Replicate It)
 
@@ -117,10 +121,10 @@ FSD organizes code into seven layers with a strict unidirectional import rule: *
 | Layer | Purpose | Example Contents |
 |-------|---------|-----------------|
 | `app` | Application shell, routing, providers, global styles | Electron window management, theme provider, error boundaries |
-| `pages` | Full views composed from widgets and features | Flow editor page, settings page, execution history page |
-| `widgets` | Self-contained UI blocks combining features | Flow canvas with toolbar, execution log panel, AI assistant panel |
-| `features` | Business capabilities delivering user value | Create node, execute flow, configure AI model, import workflow |
-| `entities` | Business domain objects | Flow, Node, Edge, Execution, AIModel, Workspace |
+| `pages` | Full views composed from widgets and features | Inbox page (primary), flow editor, settings, plugin marketplace, execution history |
+| `widgets` | Self-contained UI blocks combining features | Unified inbox feed, detail panel, AI draft panel, sidebar, flow canvas, command palette |
+| `features` | Business capabilities delivering user value | Inbox filtering, inbox actions, plugin configuration, onboarding, configure-node, undo-redo |
+| `entities` | Business domain objects | InboxItem, Plugin, AIProvider, Flow, Node, Edge, Execution, Workspace |
 | `shared` | Reusable, project-agnostic code | Design system components, hooks, utilities, types, IPC client |
 
 Within each layer (except `app` and `shared`), code is divided into **slices** by business domain. Slices on the same layer cannot import from each other. Within each slice, code is organized into **segments**:
@@ -138,6 +142,33 @@ Within each layer (except `app` and `shared`), code is divided into **slices** b
 **Colocation**: Styles, tests, and types live next to their component, not in separate directories.
 
 **Public API enforcement**: Every slice exposes a barrel `index.ts` file. Internal modules are never imported directly from outside the slice. ESLint rules enforce this boundary.
+
+### 3.3 Plugin View System
+
+Plugins can register custom views that extend the DevRig UI. These views appear in two contexts:
+
+1. **Detail views**: When a user selects an inbox item provided by a plugin, the detail panel renders the plugin's custom detail view. For example, a GitHub plugin registers a pull request detail view that shows diffs, checks, and review status.
+
+2. **Dashboard panels**: Plugins can register dashboard widgets that appear on the inbox page as summary cards or sidebar sections (e.g., a "GitHub Activity" panel or "Linear Sprint Progress" panel).
+
+**Rendering strategy**: Plugin views are rendered using one of two mechanisms, depending on the plugin's trust level and complexity:
+
+- **Sandboxed iframes**: Third-party and marketplace plugins render their views inside sandboxed `<iframe>` elements with a restrictive `sandbox` attribute (`allow-scripts` only, no `allow-same-origin`). Communication between the host renderer and the iframe uses `postMessage` with a structured protocol. The iframe receives serialized item data and emits user action intents back to the host.
+
+- **Serialized UI descriptions**: For simpler views or first-party plugins, the plugin returns a JSON-based UI description (a declarative tree of layout primitives: `stack`, `text`, `badge`, `button`, `link`, `code`, `divider`). The host renderer interprets this description and renders it using native shadcn/ui components. This approach avoids iframe overhead and ensures visual consistency with the rest of the application.
+
+```
+Plugin View Registration:
+plugin.registerView({
+  type: 'detail',                    // 'detail' | 'dashboard-panel'
+  itemTypes: ['github:pull-request'], // Which inbox item types this view handles
+  render: 'serialized',             // 'serialized' | 'iframe'
+  // For serialized: return a UI description tree
+  // For iframe: return a URL to the plugin's bundled HTML
+});
+```
+
+The `entities/plugin/` slice owns the plugin view registry. The `widgets/detail-panel/` widget consults the registry to determine which view to render for a selected inbox item. If no plugin view is registered for an item type, a generic detail view is used as the fallback.
 
 ---
 
@@ -223,15 +254,23 @@ const ActionNode = memo(({ id, data }: NodeProps<ActionNodeData>) => {
 
 ```
 stores/
+├── inbox-store.ts         # Inbox items, filters, read/unread state, AI classifications
+├── plugin-store.ts        # Installed plugins, sync status, configuration
+├── ai-store.ts            # AI providers, model selection, usage tracking
 ├── flow-store.ts          # Nodes, edges, viewport, selected elements
 ├── execution-store.ts     # Running executions, logs, step statuses
 ├── workspace-store.ts     # Workspace config, recent files, preferences
-├── ai-store.ts            # AI model configs, conversation history
 ├── ui-store.ts            # Sidebar state, panel sizes, modals, toasts
 └── command-store.ts       # Command palette state, recent commands
 ```
 
-**Store boundary rule**: Each store is independent with no direct cross-store imports. Cross-store coordination happens through React components that subscribe to multiple stores, or through the IPC layer (e.g., starting an execution reads from flow-store and writes to execution-store).
+**`inbox-store.ts`**: The primary store for the application's default view. Holds the unified list of inbox items aggregated from all connected plugins, along with filter state (source, type, priority, read/unread), sort order, and AI-generated classifications (priority level, suggested action, category). Items are normalized by ID for O(1) lookup. The store supports optimistic read/unread toggling and bulk actions (archive, snooze, mark-done).
+
+**`plugin-store.ts`**: Tracks all installed plugins, their connection/sync status (connected, syncing, error, disconnected), configuration state, and the view registrations each plugin has made (detail views, dashboard panels). Plugin sync progress is exposed here so the UI can show per-source sync indicators.
+
+**`ai-store.ts`**: Manages AI provider configurations (API keys stored via safeStorage, not in this store), model selection per task type (classification, drafting, summarization), and usage tracking (token counts, rate limit status). This store is consumed by both the inbox AI features and the flow builder AI node.
+
+**Store boundary rule**: Each store is independent with no direct cross-store imports. Cross-store coordination happens through React components that subscribe to multiple stores, or through the IPC layer (e.g., starting an execution reads from flow-store and writes to execution-store; an inbox action may trigger a flow execution).
 
 ### 5.3 Local-First Data Architecture (Linear-Inspired)
 
@@ -539,6 +578,10 @@ The following shadcn/ui components are included and customized:
 
 **Custom components** (built on Radix primitives, not from shadcn/ui):
 
+- `InboxFeed` -- Virtualized, priority-sorted list of unified inbox items
+- `DetailPanel` -- Context-sensitive item detail view with plugin view rendering
+- `AIDraftPanel` -- AI-generated response/action suggestions for the selected item
+- `PluginStatusIndicator` -- Connection and sync status for each plugin source
 - `FlowCanvas` -- React Flow wrapper with project-specific defaults
 - `NodePalette` -- Draggable node type sidebar
 - `PropertyPanel` -- Context-sensitive node configuration editor
@@ -639,14 +682,14 @@ Targeting cold start to interactive UI in under 1.5 seconds.
 
 **Strategies**:
 
-1. **Route-based code splitting**: Only the initial view (last-opened flow or dashboard) is loaded at startup. Settings, execution history, and other views are lazy-loaded.
+1. **Route-based code splitting**: Only the initial view (the inbox) is loaded at startup. The flow editor, settings, execution history, plugin marketplace, and other views are lazy-loaded.
 
 2. **Preload script minimization**: The preload script exposes only the typed IPC API surface. No business logic, no heavy imports.
 
 3. **Tiered data loading** (Linear-inspired):
-   - **Immediate**: Workspace config, recently opened flow metadata, UI preferences.
-   - **Deferred (within 1s)**: Full flow data for the current view.
-   - **Lazy (on demand)**: Execution history, AI conversation history, other flows.
+   - **Immediate**: Workspace config, UI preferences, inbox items (most recent page), plugin connection status.
+   - **Deferred (within 1s)**: AI classifications for visible inbox items, plugin sync deltas.
+   - **Lazy (on demand)**: Full flow data, execution history, AI conversation history, older inbox items.
 
 4. **V8 bytecode snapshots**: electron-vite 5.0 supports compiling renderer code to V8 bytecode, which eliminates JavaScript parsing time on subsequent launches.
 
@@ -709,6 +752,13 @@ Targeting cold start to interactive UI in under 1.5 seconds.
 Command Palette
 ├── Search Input (auto-focused, fuzzy search)
 ├── Command Groups
+│   ├── Inbox
+│   │   ├── Go to Inbox           [Cmd+1]
+│   │   ├── Mark as Read          [Cmd+Shift+R]
+│   │   ├── Archive               [E]
+│   │   ├── Snooze...             [H]
+│   │   ├── AI Draft Response     [Cmd+Shift+D]
+│   │   └── Filter by Source...   [F]
 │   ├── Flow Actions
 │   │   ├── Add Node...           [A]
 │   │   ├── Run Flow              [Cmd+Enter]
@@ -717,7 +767,8 @@ Command Palette
 │   ├── Navigation
 │   │   ├── Go to Flow...         [Cmd+P]
 │   │   ├── Go to Settings        [Cmd+,]
-│   │   └── Go to Executions      [Cmd+Shift+H]
+│   │   ├── Go to Executions      [Cmd+Shift+H]
+│   │   └── Go to Plugins         [Cmd+Shift+M]
 │   ├── Edit
 │   │   ├── Undo                  [Cmd+Z]
 │   │   ├── Redo                  [Cmd+Shift+Z]
@@ -725,7 +776,7 @@ Command Palette
 │   │   └── Delete Selected       [Backspace]
 │   ├── View
 │   │   ├── Toggle Sidebar        [Cmd+B]
-│   │   ├── Toggle Properties     [Cmd+Shift+P]
+│   │   ├── Toggle Detail Panel   [Cmd+Shift+P]
 │   │   ├── Zoom to Fit           [Cmd+0]
 │   │   └── Toggle Theme          [Cmd+Shift+T]
 │   └── AI
@@ -747,6 +798,7 @@ Command Palette
 | Category | Shortcut | Action |
 |----------|----------|--------|
 | **Global** | `Cmd+K` | Open command palette |
+| | `Cmd+1` | Go to inbox |
 | | `Cmd+,` | Open settings |
 | | `Cmd+N` | New flow |
 | | `Cmd+O` | Open flow |
@@ -754,6 +806,13 @@ Command Palette
 | | `Cmd+Z` | Undo |
 | | `Cmd+Shift+Z` | Redo |
 | | `Cmd+B` | Toggle sidebar |
+| **Inbox** | `J` / `K` | Next / previous item |
+| | `Enter` | Open selected item |
+| | `E` | Archive selected |
+| | `H` | Snooze selected |
+| | `Cmd+Shift+R` | Mark as read/unread |
+| | `Cmd+Shift+D` | AI draft response |
+| | `F` | Open filter menu |
 | **Canvas** | `A` | Add node (opens node palette) |
 | | `Space+Drag` | Pan canvas |
 | | `Cmd+Scroll` | Zoom |
@@ -885,24 +944,42 @@ devrig/
 │       │           └── light.css
 │       │
 │       ├── pages/                        # FSD: Pages layer
+│       │   ├── inbox/                   # PRIMARY page
+│       │   │   ├── ui/
+│       │   │   │   └── InboxPage.tsx
+│       │   │   └── index.ts
 │       │   ├── flow-editor/
 │       │   │   ├── ui/
 │       │   │   │   └── FlowEditorPage.tsx
-│       │   │   └── index.ts
-│       │   ├── dashboard/
-│       │   │   ├── ui/
-│       │   │   │   └── DashboardPage.tsx
 │       │   │   └── index.ts
 │       │   ├── execution-history/
 │       │   │   ├── ui/
 │       │   │   │   └── ExecutionHistoryPage.tsx
 │       │   │   └── index.ts
-│       │   └── settings/
+│       │   ├── settings/
+│       │   │   ├── ui/
+│       │   │   │   └── SettingsPage.tsx
+│       │   │   └── index.ts
+│       │   └── plugin-marketplace/
 │       │       ├── ui/
-│       │       │   └── SettingsPage.tsx
+│       │       │   └── PluginMarketplacePage.tsx
 │       │       └── index.ts
 │       │
 │       ├── widgets/                      # FSD: Widgets layer
+│       │   ├── inbox-feed/
+│       │   │   ├── ui/
+│       │   │   │   ├── InboxFeed.tsx    # Unified inbox item list
+│       │   │   │   └── InboxItemRow.tsx
+│       │   │   └── index.ts
+│       │   ├── detail-panel/
+│       │   │   ├── ui/
+│       │   │   │   ├── DetailPanel.tsx  # Context-sensitive item detail
+│       │   │   │   └── GenericDetail.tsx # Fallback for unregistered types
+│       │   │   └── index.ts
+│       │   ├── ai-draft-panel/
+│       │   │   ├── ui/
+│       │   │   │   └── AIDraftPanel.tsx # AI-generated responses/actions
+│       │   │   └── index.ts
 │       │   ├── flow-canvas/
 │       │   │   ├── ui/
 │       │   │   │   ├── FlowCanvas.tsx
@@ -933,6 +1010,26 @@ devrig/
 │       │       └── index.ts
 │       │
 │       ├── features/                     # FSD: Features layer
+│       │   ├── inbox-filter/
+│       │   │   ├── ui/
+│       │   │   │   ├── InboxFilterBar.tsx
+│       │   │   │   └── FilterPresets.tsx
+│       │   │   ├── model/
+│       │   │   │   └── inbox-filter.ts
+│       │   │   └── index.ts
+│       │   ├── inbox-actions/
+│       │   │   ├── ui/
+│       │   │   │   └── InboxActionBar.tsx
+│       │   │   ├── model/
+│       │   │   │   └── inbox-actions.ts  # Archive, snooze, mark-done, etc.
+│       │   │   └── index.ts
+│       │   ├── onboarding/
+│       │   │   ├── ui/
+│       │   │   │   ├── OnboardingWizard.tsx
+│       │   │   │   └── PluginConnectStep.tsx
+│       │   │   ├── model/
+│       │   │   │   └── onboarding.ts
+│       │   │   └── index.ts
 │       │   ├── create-node/
 │       │   │   ├── ui/
 │       │   │   │   └── CreateNodeDialog.tsx
@@ -974,6 +1071,33 @@ devrig/
 │       │       └── index.ts
 │       │
 │       ├── entities/                     # FSD: Entities layer
+│       │   ├── inbox-item/
+│       │   │   ├── ui/
+│       │   │   │   ├── InboxItemCard.tsx
+│       │   │   │   └── InboxItemBadge.tsx
+│       │   │   ├── model/
+│       │   │   │   ├── inbox-store.ts    # Zustand store
+│       │   │   │   └── inbox-item.types.ts
+│       │   │   ├── api/
+│       │   │   │   └── inbox-ipc.ts
+│       │   │   └── index.ts
+│       │   ├── plugin/
+│       │   │   ├── ui/
+│       │   │   │   ├── PluginCard.tsx
+│       │   │   │   └── PluginStatus.tsx
+│       │   │   ├── model/
+│       │   │   │   ├── plugin-store.ts   # Zustand store
+│       │   │   │   └── plugin.types.ts
+│       │   │   ├── api/
+│       │   │   │   └── plugin-ipc.ts
+│       │   │   └── index.ts
+│       │   ├── ai-provider/
+│       │   │   ├── model/
+│       │   │   │   ├── ai-store.ts       # Zustand store
+│       │   │   │   └── ai-provider.types.ts
+│       │   │   ├── api/
+│       │   │   │   └── ai-ipc.ts
+│       │   │   └── index.ts
 │       │   ├── flow/
 │       │   │   ├── ui/
 │       │   │   │   └── FlowCard.tsx
@@ -1004,15 +1128,10 @@ devrig/
 │       │   │   │   ├── execution-store.ts
 │       │   │   │   └── execution.types.ts
 │       │   │   └── index.ts
-│       │   ├── workspace/
-│       │   │   ├── model/
-│       │   │   │   ├── workspace-store.ts
-│       │   │   │   └── workspace.types.ts
-│       │   │   └── index.ts
-│       │   └── ai-model/
+│       │   └── workspace/
 │       │       ├── model/
-│       │       │   ├── ai-store.ts
-│       │       │   └── ai-model.types.ts
+│       │       │   ├── workspace-store.ts
+│       │       │   └── workspace.types.ts
 │       │       └── index.ts
 │       │
 │       └── shared/                       # FSD: Shared layer
@@ -1076,14 +1195,16 @@ Desktop apps do not use URL-based routing. DevRig uses a simple state-based rout
 ```tsx
 // app/router/router.tsx
 type Route =
-  | { view: 'dashboard' }
+  | { view: 'inbox' }
+  | { view: 'inbox'; itemId: string }
   | { view: 'flow-editor'; flowId: string }
   | { view: 'execution-history' }
-  | { view: 'settings'; section?: string };
+  | { view: 'settings'; section?: string }
+  | { view: 'plugin-marketplace' };
 
 const useRouterStore = create<{ route: Route; navigate: (r: Route) => void }>(
   (set) => ({
-    route: { view: 'dashboard' },
+    route: { view: 'inbox' },
     navigate: (route) => set({ route }),
   })
 );
@@ -1093,16 +1214,17 @@ function AppRouter() {
 
   return (
     <Suspense fallback={<PageSkeleton />}>
-      {route.view === 'dashboard' && <DashboardPage />}
+      {route.view === 'inbox' && <InboxPage itemId={'itemId' in route ? route.itemId : undefined} />}
       {route.view === 'flow-editor' && <FlowEditorPage flowId={route.flowId} />}
       {route.view === 'execution-history' && <ExecutionHistoryPage />}
       {route.view === 'settings' && <SettingsPage section={route.section} />}
+      {route.view === 'plugin-marketplace' && <PluginMarketplacePage />}
     </Suspense>
   );
 }
 ```
 
-Each page component is wrapped in `React.lazy()` for code splitting. The `Suspense` boundary shows a skeleton that matches the target page's layout.
+The inbox is the default and primary route. Each page component is wrapped in `React.lazy()` for code splitting. The `Suspense` boundary shows a skeleton that matches the target page's layout.
 
 ---
 

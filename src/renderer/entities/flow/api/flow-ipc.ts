@@ -46,6 +46,36 @@ export async function deleteFlow(id: string): Promise<boolean> {
   return ipcInvoke<boolean>('db:workflow:delete', id)
 }
 
+export async function createNode(data: {
+  workflowId: string
+  type: string
+  label?: string
+  x?: number
+  y?: number
+  config?: string
+}): Promise<FlowNode> {
+  return ipcInvoke<FlowNode>('db:node:create', data)
+}
+
+export async function deleteNode(id: string): Promise<boolean> {
+  return ipcInvoke<boolean>('db:node:delete', id)
+}
+
+export async function createEdge(data: {
+  workflowId: string
+  sourceNodeId: string
+  targetNodeId: string
+  sourceHandle?: string
+  targetHandle?: string
+  label?: string
+}): Promise<FlowEdge> {
+  return ipcInvoke<FlowEdge>('db:edge:create', data)
+}
+
+export async function deleteEdge(id: string): Promise<boolean> {
+  return ipcInvoke<boolean>('db:edge:delete', id)
+}
+
 export async function batchCreateNodes(
   nodes: Array<{
     workflowId: string

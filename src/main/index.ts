@@ -14,6 +14,7 @@ import {
   SettingsRepository
 } from './db/repositories'
 import { registerDbHandlers } from './ipc/db-handlers'
+import { registerExecutionHandlers } from './ipc/execution-handlers'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -73,6 +74,7 @@ function initDatabase(): void {
     settings: new SettingsRepository(db)
   }
   registerDbHandlers(repos)
+  registerExecutionHandlers(repos, () => mainWindow)
 }
 
 app.whenReady().then(() => {

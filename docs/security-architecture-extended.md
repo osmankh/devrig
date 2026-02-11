@@ -910,6 +910,33 @@ async function verifyPluginSignature(
 }
 ```
 
+### 4.7 Plugin Signature Verification
+
+All plugins undergo signature verification before loading:
+
+- **First-party plugins**: Signed with the DevRig Ed25519 signing key. Signature is verified against the public key embedded in the application binary. First-party plugins are auto-trusted and do not prompt for permission approval.
+- **Verified community plugins**: Signed by the plugin author's key, which is counter-signed by DevRig after code review. Both signatures are verified at load time. If either signature fails, the plugin is rejected.
+- **Unverified community plugins**: Not signed by DevRig. The user receives a prominent warning dialog ("This plugin has not been reviewed by DevRig. Install at your own risk.") and must explicitly approve installation. These plugins run in the most restrictive sandbox tier (Tier 3 / WASM).
+
+### 4.8 Plugin Update Security
+
+When a plugin update is installed, the host compares the new manifest against the previously approved manifest:
+
+- **No new permissions**: Update is applied silently (signature verification still required).
+- **New permissions requested**: The update is held and the user is prompted to review and approve the new permissions before the update is applied. The previous version continues running until approval.
+- **Permissions removed**: Update is applied silently. Removed permissions take effect immediately.
+- **Manifest schema change**: If the manifest version changes, the plugin is treated as a new installation and requires full permission approval.
+
+### 4.9 Plugin Marketplace Security
+
+Plugins submitted to the DevRig marketplace undergo automated security scanning:
+
+1. **Static analysis**: The plugin bundle is scanned for known malicious patterns (obfuscated code, encoded payloads, known exploit signatures) using Semgrep rules.
+2. **Permission audit**: The declared permissions are checked against the plugin's actual code behavior. A plugin that declares no network access but contains URL construction patterns is flagged for manual review.
+3. **Dependency audit**: The plugin's bundled dependencies are checked against known vulnerability databases (OSV, npm advisory).
+4. **Size and resource limits**: Plugin bundles exceeding 10 MB are flagged for review. Bundles must not include native binaries.
+5. **Manual review queue**: Plugins that fail automated checks or request high-risk permissions (file write, network write, secrets access) are queued for manual review by the DevRig security team.
+
 References:
 - [isolated-vm: Secure JS Environments](https://github.com/laverdet/isolated-vm)
 - [WebAssembly Security Model](https://webassembly.org/docs/security/)
@@ -1434,14 +1461,53 @@ async function destroyAllData(): Promise<void> {
 }
 ```
 
-### 7.4 Data at Rest Summary
+### 7.4 Inbox Item Encryption
+
+Inbox items synced from external plugins (emails, notifications, messages) may contain sensitive content. The following encryption controls apply:
+
+- **Field-level encryption**: Sensitive inbox item fields (email body, credentials, private message content) are encrypted at rest using AES-256-GCM with the database encryption key. The `content` and `raw_data` columns in the `inbox_items` table use field-level encryption. Metadata fields (subject line, sender name, timestamps) remain unencrypted for query and sort performance.
+- **Plugin-specific encryption**: Each plugin can mark specific fields in its inbox item schema as `sensitive: true`. The host automatically applies field-level encryption to these fields before writing to SQLite.
+
+### 7.5 Plugin Data Lifecycle
+
+When a plugin is uninstalled, all data associated with that plugin is deleted:
+
+1. All `inbox_items` rows where `plugin_id` matches the uninstalled plugin are permanently deleted.
+2. All `sync_state` records for the plugin are deleted (sync cursors, pagination tokens, last sync timestamps).
+3. All plugin-specific secrets in `safeStorage` (OAuth tokens, API keys) under the `plugin:<id>:*` namespace are deleted.
+4. All plugin-specific settings and preferences are removed from the `settings` table.
+5. The plugin's sandbox isolate is disposed and its cached code bundle is deleted from disk.
+6. If `secure_delete` pragma is enabled (recommended), the deleted data is overwritten with zeros in SQLite.
+
+The deletion is atomic: if any step fails, the plugin remains installed and the user is notified. A partial uninstall state is not permitted.
+
+### 7.6 Data Export (GDPR Compliance)
+
+Users can export all their data via Settings > Privacy > Export My Data. The export includes:
+
+- All workflow definitions and configurations
+- All execution history and step logs
+- All inbox items, organized by plugin (e.g., `gmail/inbox_items.json`, `github/inbox_items.json`)
+- User preferences and settings
+- Plugin installation list and granted permissions
+
+The export does **not** include:
+- API keys or OAuth tokens (security risk if export file is compromised)
+- Database encryption keys
+- License certificates
+
+The export is delivered as a ZIP archive with a JSON manifest describing the contents and schema version for portability.
+
+### 7.7 Data at Rest Summary
 
 | Data Type | Storage | Encryption | Key Source |
 |-----------|---------|-----------|------------|
 | API keys / tokens | `vault.enc` file | safeStorage (OS keychain) | OS credential store |
 | Database (workflows, history) | `devrig.db` | SQLCipher AES-256 + HMAC-SHA512 | Random key in OS keychain |
+| Inbox items (sensitive fields) | `devrig.db` | SQLCipher + field-level AES-256-GCM | Same DB key |
 | License certificate | `license.cert` | safeStorage (OS keychain) | OS credential store |
 | Application preferences | Database | SQLCipher (same DB) | Same DB key |
+| Plugin sync state | Database | SQLCipher (same DB) | Same DB key |
 | Temporary files | Memory / OS temp | Not persisted | N/A (ephemeral) |
 | Log files | `logs/` directory | **Not encrypted** (no secrets in logs) | N/A |
 

@@ -531,7 +531,24 @@ export class FieldEncryption {
 }
 ```
 
-### 3.5 Secrets Management Rules
+### 3.5 Multi-Provider API Key Management
+
+Users may configure API keys for multiple AI and integration providers. All provider keys are stored via `safeStorage` with the following conventions:
+
+| Provider | Key Identifier | Storage |
+|---|---|---|
+| Anthropic (Claude) | `ai:anthropic` | safeStorage |
+| OpenAI | `ai:openai` | safeStorage |
+| Google (Gemini) | `ai:google` | safeStorage |
+| GitHub | `integration:github` | safeStorage (or OAuth token) |
+| Linear | `integration:linear` | safeStorage (or OAuth token) |
+| Gmail | `integration:gmail` | OAuth token via safeStorage |
+
+**Plugin credential isolation**: Each plugin's secrets are namespaced by `plugin_id`. A plugin with ID `gmail` stores its secrets under the `plugin:gmail:*` namespace. The host's secrets manager enforces that one plugin cannot read or enumerate another plugin's secrets. The namespace boundary is enforced in the main process, not in the sandbox.
+
+**OAuth refresh token rotation**: For plugins that use OAuth (Gmail, GitHub, Linear), the host implements automatic token refresh. When an access token expires, the host transparently refreshes it using the stored refresh token, updates `safeStorage` with the new token pair, and retries the request. Refresh tokens are rotated on each use (the old refresh token is invalidated when a new one is issued) to limit the window of exposure from a stolen token.
+
+### 3.6 Secrets Management Rules
 
 1. **NEVER** store API keys, tokens, or passwords in `localStorage`, `sessionStorage`, or unencrypted files.
 2. **NEVER** log secrets to console, crash reports, or analytics.
@@ -959,7 +976,44 @@ Every plugin declares its required capabilities in a manifest:
 | 2 | **Community** | Automated static analysis; community reputation score >= 4.0 | Standard permission model; user prompted for each permission |
 | 3 | **Experimental** | No review; self-published | Restricted permissions (no file write, no secrets access); warning displayed |
 
-### 5.5 Resource Limits
+### 5.5 Plugin Capabilities and Data Isolation
+
+Plugins in DevRig provide a rich set of capabilities beyond simple action executors. Each plugin can contribute:
+
+- **Data sources**: Sync external data into the inbox (e.g., Gmail messages, GitHub notifications, Linear issues)
+- **Actions**: Execute operations on external services (e.g., send email, create PR, update issue)
+- **AI pipelines**: Custom AI processing chains (e.g., classify, summarize, draft reply)
+- **Views**: Plugin-provided UI panels rendered in the app (e.g., email detail view, PR diff view)
+- **Flow nodes**: Custom node types for the flow builder (e.g., "Send Gmail", "Create Linear Issue")
+
+**Plugin network permissions**: Each plugin declares a domain allowlist in its manifest. The host enforces this allowlist at the network layer. For example, a Gmail plugin may only access `gmail.googleapis.com` and `oauth2.googleapis.com`. Requests to any other domain are rejected by the host function proxy, not by the plugin itself.
+
+```typescript
+// Plugin manifest network declaration example
+{
+  "permissions": {
+    "network": {
+      "domains": ["gmail.googleapis.com", "oauth2.googleapis.com"],
+      "reason": "Access Gmail API for inbox sync and send operations"
+    }
+  }
+}
+```
+
+**Plugin data isolation**: Each plugin's inbox items are tagged with the originating `plugin_id` in the database. The host API enforces that plugins can only query and modify their own data. A Gmail plugin cannot read Linear inbox items, and vice versa. This isolation is enforced at the host function level, not within the sandbox -- the plugin never receives a raw database handle.
+
+**Plugin view sandboxing**: Plugin-provided views (UI panels) run in sandboxed rendering contexts. They cannot access the main app's Zustand stores, React tree, or IPC bridge directly. Communication between plugin views and the host app uses a structured message-passing API with schema validation.
+
+**OAuth token management**: Plugins that use OAuth (Gmail, GitHub, Linear) store their tokens via the host's `safeStorage` mechanism. OAuth tokens are never exposed to the plugin sandbox directly. Instead, the host provides proxy functions (e.g., `hostFetch`) that automatically attach the appropriate Authorization header. The plugin code never sees the raw token value.
+
+```typescript
+// Host function proxy pattern for OAuth plugins
+// The plugin calls: await hostFetch('https://gmail.googleapis.com/gmail/v1/users/me/messages')
+// The host intercepts, validates the URL against the plugin's domain allowlist,
+// attaches the OAuth token from safeStorage, and returns the response body.
+```
+
+### 5.6 Resource Limits
 
 | Resource | Default Limit | Maximum Configurable |
 |---|---|---|
@@ -1361,7 +1415,24 @@ export async function secureUninstall(): Promise<void> {
 }
 ```
 
-### 7.4 Backup Encryption
+### 7.4 AI Provider Security
+
+DevRig supports multiple AI providers (Claude/Anthropic, OpenAI, Google Gemini) for inbox triage, classification, summarization, and draft generation. The following security controls apply to all AI interactions:
+
+**AI provider key security**: API keys for AI providers are stored exclusively in `safeStorage` and are never sent to the renderer process. All AI API calls originate from the main process (or a utility process). The renderer requests AI operations via IPC (e.g., `ai:classify`, `ai:summarize`), and the main process attaches the appropriate provider key before making the outbound request.
+
+**AI data handling and user consent**: Inbox item content sent to AI providers for classification or summarization is subject to user consent. On first use of any AI feature, a privacy dialog informs the user that their data will be transmitted to the selected AI provider's API. Users can opt out per provider or globally. The consent state is stored locally and can be changed at any time in Settings > Privacy > AI Data.
+
+**AI cost protection**: To prevent runaway costs from misconfigured workflows or loops:
+- Per-provider daily budget caps (configurable, default $5/day for Pro tier)
+- Per-execution rate limiting (max 50 AI calls per workflow execution)
+- Monthly spending alerts at 80% of budget
+- Hard stop when budget is exhausted (workflow pauses, user notified)
+- Budget tracking stored locally in SQLite; no cloud dependency
+
+**Data classification storage**: AI-generated classifications (e.g., priority, category, sentiment) are stored locally in the SQLite database alongside the inbox item. Classifications are never sent to external services. They exist solely for local filtering, sorting, and automation rules.
+
+### 7.5 Backup Encryption
 
 If DevRig provides local backup functionality:
 
