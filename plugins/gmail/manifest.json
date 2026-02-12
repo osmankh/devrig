@@ -1,0 +1,70 @@
+{
+  "id": "gmail",
+  "name": "Gmail",
+  "version": "0.1.0",
+  "description": "Gmail integration — sync emails, AI classification, draft replies, and inbox actions",
+  "author": { "name": "DevRig", "url": "https://devrig.dev" },
+  "permissions": {
+    "network": ["*.googleapis.com"],
+    "secrets": ["gmail_oauth_token", "gmail_refresh_token"],
+    "ai": true
+  },
+  "capabilities": {
+    "dataSources": [
+      {
+        "id": "emails",
+        "name": "Gmail Emails",
+        "entryPoint": "src/index.js",
+        "syncInterval": 60,
+        "description": "Syncs emails from Gmail inbox using historyId-based incremental sync"
+      }
+    ],
+    "actions": [
+      {
+        "id": "reply",
+        "name": "Reply to Email",
+        "entryPoint": "src/index.js",
+        "description": "Send a reply to an email thread",
+        "parameters": {
+          "itemId": { "type": "string", "description": "Inbox item ID", "required": true },
+          "body": { "type": "string", "description": "Reply body text", "required": true }
+        }
+      },
+      {
+        "id": "archive",
+        "name": "Archive Email",
+        "entryPoint": "src/index.js",
+        "description": "Remove email from inbox (archive)",
+        "parameters": {
+          "itemId": { "type": "string", "description": "Inbox item ID", "required": true }
+        }
+      },
+      {
+        "id": "label",
+        "name": "Apply Label",
+        "entryPoint": "src/index.js",
+        "description": "Apply a Gmail label to a message",
+        "parameters": {
+          "itemId": { "type": "string", "description": "Inbox item ID", "required": true },
+          "labelId": { "type": "string", "description": "Gmail label ID", "required": true }
+        }
+      }
+    ],
+    "aiPipelines": [
+      {
+        "id": "classify-emails",
+        "name": "Classify Emails",
+        "entryPoint": "src/index.js",
+        "trigger": "onNewItems",
+        "description": "AI-classify emails as important, needs_reply, fyi, or noise"
+      },
+      {
+        "id": "draft-reply",
+        "name": "Draft Reply",
+        "entryPoint": "src/index.js",
+        "trigger": "onAction",
+        "description": "AI-generate a draft reply for an email"
+      }
+    ]
+  }
+}

@@ -11,12 +11,32 @@ import {
   NodeRepository,
   EdgeRepository,
   ExecutionRepository,
-  SettingsRepository
+  SettingsRepository,
+  SecretsRepository,
+  PluginRepository,
+  InboxRepository,
+  PluginSyncRepository,
+  AiOperationsRepository
 } from './db/repositories'
 import { registerDbHandlers } from './ipc/db-handlers'
 import { registerExecutionHandlers } from './ipc/execution-handlers'
+import { registerInboxHandlers } from './ipc/inbox-handlers'
+import { registerPluginHandlers } from './ipc/plugin-handlers'
+import { registerAIHandlers } from './ipc/ai-handlers'
+import { SyncScheduler } from './services/sync-scheduler'
+import {
+  AIProviderRegistry,
+  ClaudeProvider,
+  SecretsBridge,
+  CostTracker,
+  ModelRouter,
+  PipelineEngine
+} from './ai'
+import { PluginManager } from './plugins'
 
 let mainWindow: BrowserWindow | null = null
+let syncScheduler: SyncScheduler | null = null
+let pluginManager: PluginManager | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -65,6 +85,8 @@ function registerSystemHandlers(): void {
 
 function initDatabase(): void {
   const db = openDatabase()
+
+  // Phase 1 repos
   const repos = {
     workspace: new WorkspaceRepository(db),
     workflow: new WorkflowRepository(db),
@@ -73,8 +95,59 @@ function initDatabase(): void {
     execution: new ExecutionRepository(db),
     settings: new SettingsRepository(db)
   }
+
+  // Phase 2 repos
+  const secrets = new SecretsRepository(db)
+  const plugin = new PluginRepository(db)
+  const inbox = new InboxRepository(db)
+  const pluginSync = new PluginSyncRepository(db)
+  const aiOperations = new AiOperationsRepository(db)
+
+  // AI layer
+  const secretsBridge = new SecretsBridge(secrets)
+  const registry = new AIProviderRegistry()
+  const claudeProvider = new ClaudeProvider(secretsBridge.getProviderKeyAsync('claude'))
+  registry.register(claudeProvider)
+
+  const costTracker = new CostTracker(aiOperations)
+  const modelRouter = new ModelRouter(registry)
+
+  // Configure default model routes (cheapest for classify, balanced for others)
+  modelRouter.setRoute('classify', 'claude', 'claude-haiku-3-5')
+  modelRouter.setRoute('summarize', 'claude', 'claude-sonnet-4-5')
+  modelRouter.setRoute('draft', 'claude', 'claude-sonnet-4-5')
+  modelRouter.setRoute('general', 'claude', 'claude-sonnet-4-5')
+
+  // Phase 1 handlers
   registerDbHandlers(repos)
   registerExecutionHandlers(repos, () => mainWindow)
+
+  // Phase 2 handlers
+  registerInboxHandlers(inbox)
+  registerPluginHandlers({ plugin, pluginSync, inbox })
+  registerAIHandlers(
+    { inbox, aiOperations },
+    () => registry.getDefault() ?? null
+  )
+
+  // Pipeline engine
+  const pipelineEngine = new PipelineEngine()
+
+  // Plugin manager
+  pluginManager = new PluginManager({
+    db,
+    pluginsDir: join(app.getPath('userData'), 'plugins')
+  })
+  pluginManager.initialize().catch((err) => {
+    console.error('[plugin-manager] Failed to initialize:', err)
+  })
+
+  // Sync scheduler
+  syncScheduler = new SyncScheduler(
+    { plugin, pluginSync, inbox },
+    () => mainWindow
+  )
+  syncScheduler.start()
 }
 
 app.whenReady().then(() => {
@@ -92,6 +165,8 @@ app.whenReady().then(() => {
 })
 
 app.on('before-quit', () => {
+  syncScheduler?.stop()
+  pluginManager?.dispose()
   closeDatabase()
 })
 

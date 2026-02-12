@@ -13,6 +13,9 @@ export const useRouterStore = create<RouterState>()((set) => ({
   navigate: (route) => set({ route })
 }))
 
+const InboxPage = lazy(() =>
+  import('@pages/inbox').then((m) => ({ default: m.InboxPage }))
+)
 const DashboardPage = lazy(() =>
   import('@pages/dashboard').then((m) => ({ default: m.DashboardPage }))
 )
@@ -26,6 +29,9 @@ const ExecutionHistoryPage = lazy(() =>
 )
 const SettingsPage = lazy(() =>
   import('@pages/settings').then((m) => ({ default: m.SettingsPage }))
+)
+const MarketplacePage = lazy(() =>
+  import('@pages/marketplace').then((m) => ({ default: m.MarketplacePage }))
 )
 
 function PageSkeleton() {
@@ -41,10 +47,12 @@ export function AppRouter() {
 
   return (
     <Suspense fallback={<PageSkeleton />}>
+      {route.view === 'inbox' && <InboxPage />}
       {route.view === 'dashboard' && <DashboardPage />}
       {route.view === 'flow-editor' && <FlowEditorPage />}
       {route.view === 'execution-history' && <ExecutionHistoryPage />}
       {route.view === 'settings' && <SettingsPage />}
+      {route.view === 'marketplace' && <MarketplacePage />}
     </Suspense>
   )
 }

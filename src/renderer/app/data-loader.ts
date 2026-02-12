@@ -2,6 +2,8 @@ import { loadBootstrapCache, saveBootstrapCache } from './bootstrap'
 import { useUIStore } from './stores/ui-store'
 import { useWorkspaceStore } from '@entities/workspace'
 import { useFlowStore } from '@entities/flow'
+import { useInboxStore } from '@entities/inbox-item'
+import { usePluginStore } from '@entities/plugin'
 
 export function loadTier1(): void {
   const cache = loadBootstrapCache()
@@ -24,8 +26,15 @@ export async function loadTier2(): Promise<void> {
       sidebarCollapsed: useUIStore.getState().sidebarCollapsed
     })
   }
+  // Load inbox and plugin data after workspace is ready
+  await loadTier3()
 }
 
-export function loadTier3(): void {
-  // Deferred loading - not yet needed for Phase 1
+export async function loadTier3(): Promise<void> {
+  // Load inbox and plugin data (Phase 2)
+  await Promise.all([
+    useInboxStore.getState().loadItems(),
+    useInboxStore.getState().loadStats(),
+    usePluginStore.getState().loadPlugins()
+  ])
 }

@@ -1,0 +1,93 @@
+{
+  "id": "linear",
+  "name": "Linear",
+  "version": "0.1.0",
+  "description": "Linear integration — sync issues, AI ticket planning, complexity estimation, and project actions",
+  "author": { "name": "DevRig", "url": "https://devrig.dev" },
+  "permissions": {
+    "network": ["api.linear.app"],
+    "secrets": ["linear_api_key"],
+    "ai": true
+  },
+  "capabilities": {
+    "dataSources": [
+      {
+        "id": "assigned-issues",
+        "name": "Assigned Issues",
+        "entryPoint": "src/index.js",
+        "syncInterval": 120,
+        "description": "Syncs Linear issues assigned to the authenticated user"
+      }
+    ],
+    "actions": [
+      {
+        "id": "update-status",
+        "name": "Update Status",
+        "entryPoint": "src/index.js",
+        "description": "Update the workflow status of an issue",
+        "parameters": {
+          "itemId": { "type": "string", "required": true },
+          "stateId": { "type": "string", "required": true }
+        }
+      },
+      {
+        "id": "assign",
+        "name": "Assign Issue",
+        "entryPoint": "src/index.js",
+        "description": "Assign an issue to a user",
+        "parameters": {
+          "itemId": { "type": "string", "required": true },
+          "assigneeId": { "type": "string", "required": true }
+        }
+      },
+      {
+        "id": "comment",
+        "name": "Comment",
+        "entryPoint": "src/index.js",
+        "description": "Post a comment on an issue",
+        "parameters": {
+          "itemId": { "type": "string", "required": true },
+          "body": { "type": "string", "required": true }
+        }
+      },
+      {
+        "id": "create-sub-issue",
+        "name": "Create Sub-Issue",
+        "entryPoint": "src/index.js",
+        "description": "Create a sub-issue under a parent issue",
+        "parameters": {
+          "itemId": { "type": "string", "required": true },
+          "title": { "type": "string", "required": true },
+          "description": { "type": "string" },
+          "teamId": { "type": "string", "required": true }
+        }
+      },
+      {
+        "id": "set-priority",
+        "name": "Set Priority",
+        "entryPoint": "src/index.js",
+        "description": "Set priority level (0=none, 1=urgent, 2=high, 3=medium, 4=low)",
+        "parameters": {
+          "itemId": { "type": "string", "required": true },
+          "priority": { "type": "number", "required": true }
+        }
+      }
+    ],
+    "aiPipelines": [
+      {
+        "id": "plan-ticket",
+        "name": "Plan Ticket",
+        "entryPoint": "src/index.js",
+        "trigger": "onAction",
+        "description": "Break issue into subtasks and suggest implementation approach"
+      },
+      {
+        "id": "estimate-complexity",
+        "name": "Estimate Complexity",
+        "entryPoint": "src/index.js",
+        "trigger": "onAction",
+        "description": "Assign 1-5 complexity estimate with reasoning"
+      }
+    ]
+  }
+}

@@ -1,23 +1,60 @@
 import { useEffect } from 'react'
 import { ThemeProvider } from './providers/ThemeProvider'
-import { AppRouter } from './router/router'
+import { AppRouter, useRouterStore } from './router/router'
 import { AppLayout } from '@widgets/layout'
 import { Toaster } from '@shared/ui'
 import { TooltipProvider } from '@shared/ui/tooltip'
 import { useUIStore } from './stores/ui-store'
-import { loadTier1, loadTier2 } from './data-loader'
+import { loadTier1, loadTier2, loadTier3 } from './data-loader'
 import { initExecutionSubscriptions } from '@entities/execution'
+import { CommandPalette } from '@widgets/command-palette'
+import { initKeyboardShortcuts, useShortcutStore } from '@features/keyboard-shortcuts'
+import { OnboardingDialog } from '@features/onboarding'
+import { useNotifications } from '@features/notifications'
 
 // Apply bootstrap cache before React renders
 loadTier1()
+
+function useRegisterNavShortcuts() {
+  const navigate = useRouterStore((s) => s.navigate)
+  const register = useShortcutStore((s) => s.register)
+
+  useEffect(() => {
+    register({
+      id: 'nav-inbox',
+      keys: 'mod+1',
+      label: 'Go to Inbox',
+      category: 'Navigation',
+      action: () => navigate({ view: 'inbox' })
+    })
+    register({
+      id: 'nav-dashboard',
+      keys: 'mod+2',
+      label: 'Go to Dashboard',
+      category: 'Navigation',
+      action: () => navigate({ view: 'dashboard' })
+    })
+    register({
+      id: 'nav-settings',
+      keys: 'mod+,',
+      label: 'Open Settings',
+      category: 'Navigation',
+      action: () => navigate({ view: 'settings' })
+    })
+  }, [navigate, register])
+}
 
 export function App() {
   const theme = useUIStore((s) => s.theme)
 
   useEffect(() => {
-    loadTier2()
+    loadTier2().then(() => loadTier3())
     initExecutionSubscriptions()
+    return initKeyboardShortcuts()
   }, [])
+
+  useRegisterNavShortcuts()
+  useNotifications()
 
   return (
     <ThemeProvider theme={theme}>
@@ -36,6 +73,8 @@ export function App() {
             </AppLayout>
           </div>
         </div>
+        <CommandPalette />
+        <OnboardingDialog />
         <Toaster />
       </TooltipProvider>
     </ThemeProvider>

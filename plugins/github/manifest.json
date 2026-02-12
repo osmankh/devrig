@@ -1,0 +1,117 @@
+{
+  "id": "github",
+  "name": "GitHub",
+  "version": "0.1.0",
+  "description": "GitHub integration — sync PRs and issues, AI code review, and repository actions",
+  "author": { "name": "DevRig", "url": "https://devrig.dev" },
+  "permissions": {
+    "network": ["api.github.com"],
+    "secrets": ["github_token"],
+    "ai": true
+  },
+  "capabilities": {
+    "dataSources": [
+      {
+        "id": "pull-requests",
+        "name": "Pull Requests",
+        "entryPoint": "src/index.js",
+        "syncInterval": 120,
+        "description": "Syncs PRs where user is assignee or reviewer"
+      },
+      {
+        "id": "issues",
+        "name": "Issues",
+        "entryPoint": "src/index.js",
+        "syncInterval": 180,
+        "description": "Syncs issues assigned to or mentioning the user"
+      }
+    ],
+    "actions": [
+      {
+        "id": "approve",
+        "name": "Approve PR",
+        "entryPoint": "src/index.js",
+        "description": "Submit an approval review on a pull request",
+        "parameters": {
+          "itemId": { "type": "string", "required": true },
+          "body": { "type": "string" }
+        }
+      },
+      {
+        "id": "request-changes",
+        "name": "Request Changes",
+        "entryPoint": "src/index.js",
+        "description": "Submit a request-changes review",
+        "parameters": {
+          "itemId": { "type": "string", "required": true },
+          "body": { "type": "string", "required": true }
+        }
+      },
+      {
+        "id": "comment",
+        "name": "Comment",
+        "entryPoint": "src/index.js",
+        "description": "Post a comment on a PR or issue",
+        "parameters": {
+          "itemId": { "type": "string", "required": true },
+          "body": { "type": "string", "required": true }
+        }
+      },
+      {
+        "id": "merge",
+        "name": "Merge PR",
+        "entryPoint": "src/index.js",
+        "description": "Merge a pull request",
+        "parameters": {
+          "itemId": { "type": "string", "required": true },
+          "mergeMethod": { "type": "string" }
+        }
+      },
+      {
+        "id": "assign",
+        "name": "Assign",
+        "entryPoint": "src/index.js",
+        "description": "Assign users to an issue or PR",
+        "parameters": {
+          "itemId": { "type": "string", "required": true },
+          "assignees": { "type": "array", "required": true }
+        }
+      },
+      {
+        "id": "add-label",
+        "name": "Add Label",
+        "entryPoint": "src/index.js",
+        "description": "Add labels to an issue or PR",
+        "parameters": {
+          "itemId": { "type": "string", "required": true },
+          "labels": { "type": "array", "required": true }
+        }
+      },
+      {
+        "id": "close",
+        "name": "Close Issue",
+        "entryPoint": "src/index.js",
+        "description": "Close an issue or PR",
+        "parameters": {
+          "itemId": { "type": "string", "required": true }
+        }
+      }
+    ],
+    "aiPipelines": [
+      {
+        "id": "review-pr",
+        "name": "AI Code Review",
+        "entryPoint": "src/index.js",
+        "trigger": "onNewItems",
+        "description": "AI-review PR diffs for bugs, style issues, and performance concerns"
+      },
+      {
+        "id": "summarize-changes",
+        "name": "Summarize Changes",
+        "entryPoint": "src/index.js",
+        "trigger": "onNewItems",
+        "description": "Generate a 2-3 sentence summary of PR changes"
+      }
+    ]
+  }
+}

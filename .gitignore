@@ -1,8 +1,42 @@
+# IDE
 .idea
+.vscode/
+*.swp
+*.swo
+
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 out/
 *.tsbuildinfo
+
+# Vite
+.vite/
+
+# SQLite (WAL mode creates -wal and -shm files)
+*.db
+*.db-wal
+*.db-shm
+
+# Test / coverage
+coverage/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Environment / secrets
 .env
-.env.local
+.env.*
+*.pem
+*.key
+*.p12
+
+# Electron Forge / packaging
+*.asar
+
+# Logs
+*.log
+npm-debug.log*

@@ -40,6 +40,30 @@ export function Sidebar() {
           <Separator />
           <nav className="flex flex-col gap-0.5 px-3 py-2">
             <button
+              onClick={() => navigate({ view: 'inbox' })}
+              className="flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-[var(--text-sm)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+                <rect
+                  x="2"
+                  y="3"
+                  width="12"
+                  height="10"
+                  rx="1.5"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                />
+                <path
+                  d="M2 10l4.5-3L8 8l1.5-1L14 10"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Inbox
+            </button>
+            <button
               onClick={() => navigate({ view: 'dashboard' })}
               className="flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-[var(--text-sm)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
             >
@@ -124,6 +148,29 @@ export function Sidebar() {
                 />
               </svg>
               Settings
+            </button>
+            <button
+              onClick={() => navigate({ view: 'marketplace' })}
+              className="flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-[var(--text-sm)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+                <rect
+                  x="2"
+                  y="2"
+                  width="12"
+                  height="12"
+                  rx="2"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                />
+                <path
+                  d="M5 8h6M8 5v6"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                />
+              </svg>
+              Plugins
             </button>
           </nav>
           <Separator />

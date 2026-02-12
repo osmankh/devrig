@@ -11,7 +11,8 @@ const badgeVariants = cva(
         success: 'bg-[oklch(0.648_0.15_160/0.15)] text-[var(--color-status-success)]',
         warning: 'bg-[oklch(0.75_0.15_80/0.15)] text-[var(--color-status-warning)]',
         error: 'bg-[oklch(0.637_0.237_25/0.15)] text-[var(--color-status-error)]',
-        secondary: 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]'
+        secondary: 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]',
+        outline: 'border border-[var(--color-border-default)] text-[var(--color-text-secondary)]'
       }
     },
     defaultVariants: {

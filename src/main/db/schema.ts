@@ -134,6 +134,99 @@ export const settings = sqliteTable('settings', {
   updatedAt: integer('updated_at').notNull()
 })
 
+// ============================================================
+// UNIFIED INBOX (Plugin Data Aggregation)
+// ============================================================
+
+export const inboxItems = sqliteTable(
+  'inbox_items',
+  {
+    id: text('id').primaryKey(),
+    pluginId: text('plugin_id')
+      .notNull()
+      .references(() => plugins.id, { onDelete: 'cascade' }),
+    externalId: text('external_id').notNull(),
+    type: text('type').notNull(),
+    title: text('title').notNull(),
+    body: text('body'),
+    preview: text('preview'),
+    sourceUrl: text('source_url'),
+    priority: integer('priority').notNull().default(0),
+    status: text('status').notNull().default('unread'),
+    aiClassification: text('ai_classification'),
+    aiSummary: text('ai_summary'),
+    aiDraft: text('ai_draft'),
+    metadata: text('metadata').default('{}'),
+    isActionable: integer('is_actionable').notNull().default(0),
+    snoozedUntil: integer('snoozed_until'),
+    externalCreatedAt: integer('external_created_at'),
+    syncedAt: integer('synced_at').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull()
+  },
+  (table) => [
+    index('idx_inbox_items_plugin').on(table.pluginId, table.status),
+    index('idx_inbox_items_status').on(table.status, table.priority, table.updatedAt),
+    index('idx_inbox_items_external').on(table.pluginId, table.externalId),
+    index('idx_inbox_items_snoozed').on(table.snoozedUntil),
+    index('idx_inbox_items_actionable').on(table.isActionable),
+    index('idx_inbox_items_type').on(table.pluginId, table.type)
+  ]
+)
+
+// ============================================================
+// PLUGIN SYNC STATE
+// ============================================================
+
+export const pluginSyncState = sqliteTable(
+  'plugin_sync_state',
+  {
+    pluginId: text('plugin_id')
+      .notNull()
+      .references(() => plugins.id, { onDelete: 'cascade' }),
+    dataSourceId: text('data_source_id').notNull(),
+    lastSyncAt: integer('last_sync_at'),
+    syncCursor: text('sync_cursor'),
+    syncStatus: text('sync_status').notNull().default('idle'),
+    error: text('error'),
+    itemsSynced: integer('items_synced').notNull().default(0),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull()
+  },
+  (table) => [
+    index('idx_pss_status').on(table.syncStatus),
+    index('idx_pss_plugin').on(table.pluginId)
+  ]
+)
+
+// ============================================================
+// AI OPERATIONS (Unified Cost Tracking)
+// ============================================================
+
+export const aiOperations = sqliteTable(
+  'ai_operations',
+  {
+    id: text('id').primaryKey(),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    operation: text('operation').notNull(),
+    pluginId: text('plugin_id').references(() => plugins.id, { onDelete: 'set null' }),
+    pipelineId: text('pipeline_id'),
+    inboxItemId: text('inbox_item_id').references(() => inboxItems.id, { onDelete: 'set null' }),
+    executionId: text('execution_id').references(() => executions.id, { onDelete: 'set null' }),
+    inputTokens: integer('input_tokens').notNull().default(0),
+    outputTokens: integer('output_tokens').notNull().default(0),
+    costUsd: real('cost_usd').notNull().default(0.0),
+    durationMs: integer('duration_ms'),
+    createdAt: integer('created_at').notNull()
+  },
+  (table) => [
+    index('idx_ai_ops_provider').on(table.provider, table.createdAt),
+    index('idx_ai_ops_plugin').on(table.pluginId, table.createdAt),
+    index('idx_ai_ops_created').on(table.createdAt)
+  ]
+)
+
 // Type exports
 export type Workspace = typeof workspaces.$inferSelect
 export type NewWorkspace = typeof workspaces.$inferInsert
@@ -148,3 +241,9 @@ export type ExecutionStep = typeof executionSteps.$inferSelect
 export type Secret = typeof secrets.$inferSelect
 export type Plugin = typeof plugins.$inferSelect
 export type Setting = typeof settings.$inferSelect
+export type InboxItem = typeof inboxItems.$inferSelect
+export type NewInboxItem = typeof inboxItems.$inferInsert
+export type PluginSyncState = typeof pluginSyncState.$inferSelect
+export type NewPluginSyncState = typeof pluginSyncState.$inferInsert
+export type AiOperation = typeof aiOperations.$inferSelect
+export type NewAiOperation = typeof aiOperations.$inferInsert
