@@ -250,18 +250,26 @@ export class PluginSandbox {
 
   async call<T>(fnName: string, args?: unknown[]): Promise<T> {
     this.ensureAlive()
+
+    // Security: validate function name to prevent injection — only allow
+    // alphanumeric, underscores, dots (for namespaced calls like "plugin.onSync")
+    if (!/^[\w.]+$/.test(fnName)) {
+      throw new Error(`Invalid function name: "${fnName}"`)
+    }
+
+    // Security: use evalClosure with $0/$1 arguments instead of string interpolation.
+    // This passes data via isolated-vm's transfer mechanism, never as eval'd strings.
     const argsJson = args ? JSON.stringify(args) : '[]'
-    const resultJson = await this.context!.eval(
+    const resultJson = await this.context!.evalClosure(
       `
-      (async () => {
-        const fn = globalThis["${fnName.replace(/"/g, '\\"')}"];
-        if (typeof fn !== 'function') throw new Error('Function not found: ${fnName.replace(/'/g, "\\'")}');
-        const args = JSON.parse('${argsJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}');
-        const result = await fn(...args);
-        return JSON.stringify(result === undefined ? null : result);
-      })()
-    `,
-      { timeout: EXECUTION_TIMEOUT_MS, promise: true }
+      const fn = globalThis[$0];
+      if (typeof fn !== 'function') throw new Error('Function not found: ' + $0);
+      const args = JSON.parse($1);
+      const result = await fn(...args);
+      return JSON.stringify(result === undefined ? null : result);
+      `,
+      [fnName, argsJson],
+      { timeout: EXECUTION_TIMEOUT_MS, promise: true, arguments: { copy: true }, result: { copy: true } }
     ) as string
 
     return JSON.parse(resultJson) as T

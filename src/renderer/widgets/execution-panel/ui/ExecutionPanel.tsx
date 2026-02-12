@@ -3,7 +3,6 @@ import { ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Loader2, SkipForw
 import { useExecutionStore } from '@entities/execution/model/execution-store'
 import { useFlowStore } from '@entities/flow/model/flow-store'
 import { ScrollArea } from '@shared/ui/scroll-area'
-import { cn } from '@shared/lib/cn'
 
 const statusConfig: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
   pending: { icon: <Clock className="h-3.5 w-3.5" />, color: 'text-[var(--color-text-tertiary)]', label: 'Pending' },
@@ -14,7 +13,7 @@ const statusConfig: Record<string, { icon: React.ReactNode; color: string; label
 }
 
 function formatDuration(ms: number | undefined): string {
-  if (ms == null) return '-'
+  if (ms === undefined) return '-'
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(1)}s`
 }
@@ -40,7 +39,7 @@ export function ExecutionPanel() {
   if (!hasExecution) return null
 
   const successCount = stepList.filter((s) => s.status === 'success').length
-  const errorCount = stepList.filter((s) => s.status === 'error').length
+  const _errorCount = stepList.filter((s) => s.status === 'error').length
   const totalDuration = stepList.reduce((sum, s) => sum + (s.durationMs ?? 0), 0)
 
   return (

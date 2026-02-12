@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
-import { usePluginStore } from '@entities/plugin'
-import type { Plugin } from '@entities/plugin'
+import { usePluginStore, type Plugin } from '@entities/plugin'
 import { Badge, Button } from '@shared/ui'
 import { Download, Power } from 'lucide-react'
 

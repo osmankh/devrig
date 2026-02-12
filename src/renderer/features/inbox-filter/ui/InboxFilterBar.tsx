@@ -2,8 +2,7 @@ import { useCallback, useState } from 'react'
 import { Search, Filter, X } from 'lucide-react'
 import { cn } from '@shared/lib/cn'
 import { Badge, Input } from '@shared/ui'
-import { useInboxStore } from '@entities/inbox-item'
-import type { InboxItemStatus, InboxPriority, InboxItemType } from '@entities/inbox-item'
+import { useInboxStore, type InboxItemStatus, type InboxPriority, type InboxItemType } from '@entities/inbox-item'
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, TYPE_OPTIONS } from '../model/inbox-filter.types'
 
 function FilterChip({
@@ -150,7 +149,7 @@ export function InboxFilterBar() {
             </Badge>
           )}
         </button>
-        {stats.unreadCount > 0 && (
+        {stats && stats.unreadCount > 0 && (
           <Badge variant="secondary" className="text-xs">
             {stats.unreadCount} unread
           </Badge>

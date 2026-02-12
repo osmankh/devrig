@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { useFlowStore, type Flow } from '@entities/flow'
+import { useFlowStore } from '@entities/flow'
 import { FlowCard } from './FlowCard'
 
 export function FlowList() {

@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Play, ChevronRight, CheckCircle2, XCircle, Clock, Loader2, Ban } from 'lucide-react'
-import { listExecutions, getExecutionWithSteps, runWorkflow } from '@entities/execution/api/execution-ipc'
-import type { Execution, ExecutionWithSteps } from '@entities/execution/api/execution-ipc'
+import { listExecutions, getExecutionWithSteps, runWorkflow, type Execution, type ExecutionWithSteps } from '@entities/execution/api/execution-ipc'
 import { useFlowStore } from '@entities/flow/model/flow-store'
 import { Button } from '@shared/ui/button'
 import { Badge } from '@shared/ui/badge'

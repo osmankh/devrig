@@ -223,7 +223,7 @@ export function registerAIHandlers(
 
   secureHandle('ai:getUsage', (_e, dateFrom: unknown, dateTo: unknown) => {
     const fromParsed = z.number().optional().safeParse(dateFrom)
-    const toParsed = z.number().optional().safeParse(dateTo)
+    const _toParsed = z.number().optional().safeParse(dateTo)
 
     const since = fromParsed.success ? fromParsed.data : undefined
 

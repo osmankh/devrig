@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { create } from 'zustand'
-import type { Route } from './routes'
-import { DEFAULT_ROUTE } from './routes'
+import { DEFAULT_ROUTE, type Route } from './routes'
 
 interface RouterState {
   route: Route

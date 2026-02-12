@@ -34,6 +34,7 @@ export { Skeleton } from './skeleton'
 export { Label } from './label'
 export { Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectItem } from './select'
 export { Textarea } from './textarea'
+export { ErrorBoundary } from './error-boundary'
 export {
   ContextMenu,
   ContextMenuTrigger,

@@ -1,5 +1,4 @@
-import { ipcRenderer } from 'electron'
-import type { IpcRendererEvent } from 'electron'
+import { ipcRenderer, type IpcRendererEvent } from 'electron'
 
 const INVOKE_CHANNELS = [
   // System

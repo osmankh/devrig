@@ -1,12 +1,15 @@
-import { ipcMain } from 'electron'
-import type { IpcMainInvokeEvent } from 'electron'
+import { app, ipcMain, type IpcMainInvokeEvent } from 'electron'
 
 function validateSender(event: IpcMainInvokeEvent): boolean {
   const senderUrl = event.senderFrame?.url
   if (!senderUrl) return false
   try {
-    const origin = new URL(senderUrl).origin
-    return origin === 'file://' || origin.startsWith('app://devrig')
+    const parsed = new URL(senderUrl)
+    // Production: only allow file:// or app://devrig
+    if (parsed.origin === 'file://' || parsed.origin.startsWith('app://devrig')) return true
+    // Dev mode: allow Vite dev server on localhost
+    if (!app.isPackaged && parsed.hostname === 'localhost') return true
+    return false
   } catch {
     return false
   }

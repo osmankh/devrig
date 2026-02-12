@@ -1,12 +1,13 @@
-import { shell } from 'electron'
-import type { BrowserWindow } from 'electron'
+import { app, shell, type BrowserWindow } from 'electron'
 
 export function configureNavigationGuards(win: BrowserWindow): void {
   win.webContents.on('will-navigate', (event, url) => {
     const parsed = new URL(url)
-    if (parsed.protocol !== 'file:' && parsed.protocol !== 'devtools:') {
-      event.preventDefault()
-    }
+    // Always allow file:// and devtools://
+    if (parsed.protocol === 'file:' || parsed.protocol === 'devtools:') return
+    // In dev mode, allow the Vite dev server on localhost
+    if (!app.isPackaged && parsed.hostname === 'localhost') return
+    event.preventDefault()
   })
 
   win.webContents.setWindowOpenHandler(({ url }) => {

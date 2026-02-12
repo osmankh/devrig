@@ -14,7 +14,7 @@ interface WorkspaceState {
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
-  immer((set, get) => ({
+  immer((set, _get) => ({
     workspaces: [],
     activeWorkspaceId: null,
     isLoading: false,
@@ -25,14 +25,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       })
       try {
         const workspaces = await api.listWorkspaces()
-        if (workspaces.length === 0) {
+        if (!Array.isArray(workspaces) || workspaces.length === 0) {
           // Auto-create default workspace
           const defaultWs = await api.createWorkspace({ name: 'Default' })
-          set((s) => {
-            s.workspaces = [defaultWs]
-            s.activeWorkspaceId = defaultWs.id
-            s.isLoading = false
-          })
+          if (defaultWs && defaultWs.id) {
+            set((s) => {
+              s.workspaces = [defaultWs]
+              s.activeWorkspaceId = defaultWs.id
+              s.isLoading = false
+            })
+          } else {
+            set((s) => { s.isLoading = false })
+          }
         } else {
           set((s) => {
             s.workspaces = workspaces

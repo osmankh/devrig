@@ -54,7 +54,7 @@ export const useFlowStore = create<FlowState>()(
       loadFlows: async (workspaceId) => {
         const flows = await api.listFlows(workspaceId)
         set((s) => {
-          s.flows = flows
+          s.flows = Array.isArray(flows) ? flows : []
         })
       },
 
@@ -74,11 +74,15 @@ export const useFlowStore = create<FlowState>()(
             s.currentWorkflowId = id
             s.nodes = {}
             s.edges = {}
-            for (const node of result.nodes) {
-              s.nodes[node.id] = node
+            if (result && Array.isArray(result.nodes)) {
+              for (const node of result.nodes) {
+                s.nodes[node.id] = node
+              }
             }
-            for (const edge of result.edges) {
-              s.edges[edge.id] = edge
+            if (result && Array.isArray(result.edges)) {
+              for (const edge of result.edges) {
+                s.edges[edge.id] = edge
+              }
             }
             s.selectedNodeIds = []
             s.isDirty = false

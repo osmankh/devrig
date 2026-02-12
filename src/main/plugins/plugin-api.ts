@@ -1,6 +1,6 @@
-import { EventEmitter } from 'events'
-import { InboxRepository } from '../db/repositories/inbox.repository'
-import { SecretsRepository } from '../db/repositories/secrets.repository'
+import type { EventEmitter } from 'events'
+import type { InboxRepository } from '../db/repositories/inbox.repository'
+import type { SecretsRepository } from '../db/repositories/secrets.repository'
 import type { HostFunctions } from './isolate-sandbox'
 
 export interface PluginApiDeps {

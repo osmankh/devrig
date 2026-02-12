@@ -5,10 +5,17 @@
   "main": "./dist/main/index.js",
   "private": true,
   "scripts": {
+    "postinstall": "bash scripts/rebuild-native.sh",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "rebuild": "bash scripts/rebuild-native.sh",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "package": "electron-forge package",
     "make": "electron-forge make"
   },
@@ -53,15 +60,22 @@
     "@electron-forge/maker-squirrel": "^7.7.0",
     "@electron-forge/maker-zip": "^7.7.0",
     "@electron-forge/shared-types": "^7.7.0",
+    "@electron/rebuild": "^3.7.2",
     "@tailwindcss/vite": "^4.1.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@typescript-eslint/eslint-plugin": "^8.55.0",
+    "@typescript-eslint/parser": "^8.55.0",
     "@vitejs/plugin-react": "^4.4.0",
     "babel-plugin-react-compiler": "19.1.0-rc.3",
-    "electron": "^34.0.0",
+    "electron": "^34.5.8",
     "electron-vite": "^5.0.0",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "tailwindcss": "^4.1.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
   }
 }

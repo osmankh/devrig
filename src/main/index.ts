@@ -112,7 +112,7 @@ function initDatabase(): void {
   const claudeProvider = new ClaudeProvider(secretsBridge.getProviderKeyAsync('claude'))
   registry.register(claudeProvider)
 
-  const costTracker = new CostTracker(aiOperations)
+  const _costTracker = new CostTracker(aiOperations)
   const modelRouter = new ModelRouter(registry)
 
   // Configure default model routes (cheapest for classify, balanced for others)
@@ -126,7 +126,7 @@ function initDatabase(): void {
   registerExecutionHandlers(repos, () => mainWindow)
 
   // Pipeline engine
-  const pipelineEngine = new PipelineEngine()
+  const _pipelineEngine = new PipelineEngine()
 
   // Plugin manager
   pluginManager = new PluginManager({

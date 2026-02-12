@@ -6,8 +6,6 @@ import type {
   AIProvider,
   ClassifyRequest,
   ClassifyResponse,
-  CompletionRequest,
-  CompletionResponse,
   DraftRequest,
   DraftResponse,
   SummarizeRequest,

@@ -2,14 +2,14 @@
 // Model Router — per-task model selection with fallback chains
 // ---------------------------------------------------------------------------
 
-import type {
-  AIModel,
-  AIProvider,
-  CompletionRequest,
-  CompletionResponse,
-  StreamChunk
+import {
+  AIProviderError,
+  type AIModel,
+  type AIProvider,
+  type CompletionRequest,
+  type CompletionResponse,
+  type StreamChunk
 } from './provider-interface'
-import { AIProviderError } from './provider-interface'
 import type { AIProviderRegistry } from './provider-registry'
 
 /** Which model to pick for a given task type. */

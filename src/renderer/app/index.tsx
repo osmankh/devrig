@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { ThemeProvider } from './providers/ThemeProvider'
 import { AppRouter, useRouterStore } from './router/router'
 import { AppLayout } from '@widgets/layout'
-import { Toaster } from '@shared/ui'
+import { Toaster, ErrorBoundary } from '@shared/ui'
 import { TooltipProvider } from '@shared/ui/tooltip'
 import { useUIStore } from './stores/ui-store'
 import { loadTier1, loadTier2, loadTier3 } from './data-loader'
@@ -48,7 +48,7 @@ export function App() {
   const theme = useUIStore((s) => s.theme)
 
   useEffect(() => {
-    loadTier2().then(() => loadTier3())
+    loadTier2()
     initExecutionSubscriptions()
     return initKeyboardShortcuts()
   }, [])
@@ -68,9 +68,11 @@ export function App() {
           </div>
           {/* Main content */}
           <div className="flex-1 overflow-hidden">
-            <AppLayout>
-              <AppRouter />
-            </AppLayout>
+            <ErrorBoundary>
+              <AppLayout>
+                <AppRouter />
+              </AppLayout>
+            </ErrorBoundary>
           </div>
         </div>
         <CommandPalette />

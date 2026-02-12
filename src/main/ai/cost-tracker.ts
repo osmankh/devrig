@@ -2,8 +2,7 @@
 // Cost Tracker — token/cost tracking with daily/monthly budgets
 // ---------------------------------------------------------------------------
 
-import type { AIModel } from './provider-interface'
-import { AIProviderError } from './provider-interface'
+import { AIProviderError, type AIModel } from './provider-interface'
 import type { AiOperationsRepository } from '../db/repositories/ai-operations.repository'
 
 // ---------------------------------------------------------------------------

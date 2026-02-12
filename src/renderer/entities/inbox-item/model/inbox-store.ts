@@ -48,6 +48,10 @@ export const useInboxStore = create<InboxState>()(
       })
       try {
         const result = await api.listInboxItems(appliedFilters)
+        if (!result || !Array.isArray(result.items)) {
+          set((s) => { s.isLoading = false })
+          return
+        }
         set((s) => {
           s.items = {}
           s.sortedIds = []
@@ -226,9 +230,11 @@ export const useInboxStore = create<InboxState>()(
     loadStats: async () => {
       try {
         const stats = await api.getInboxStats()
-        set((s) => {
-          s.stats = stats
-        })
+        if (stats && typeof stats === 'object' && 'unreadCount' in stats) {
+          set((s) => {
+            s.stats = stats
+          })
+        }
       } catch {
         // Stats are non-critical, fail silently
       }

@@ -1,5 +1,4 @@
-import { type DragEvent, memo } from 'react'
-import type { ReactNode } from 'react'
+import { type DragEvent, memo, type ReactNode } from 'react'
 import { cn } from '@shared/lib/cn'
 
 interface NodePaletteItemProps {

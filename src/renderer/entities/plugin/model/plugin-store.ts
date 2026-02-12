@@ -30,6 +30,10 @@ export const usePluginStore = create<PluginState>()(
       })
       try {
         const plugins = await api.listPlugins()
+        if (!Array.isArray(plugins)) {
+          set((s) => { s.isLoading = false })
+          return
+        }
         set((s) => {
           s.plugins = {}
           for (const plugin of plugins) {
@@ -100,6 +104,7 @@ export const usePluginStore = create<PluginState>()(
 
     loadSyncState: async (id) => {
       const states = await api.getSyncState(id)
+      if (!Array.isArray(states)) return
       set((s) => {
         for (const state of states) {
           const key = `${state.pluginId}:${state.dataSourceId}`
