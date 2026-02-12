@@ -6,6 +6,9 @@ import * as api from '../api/flow-ipc'
 
 // Auto-save timer
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+let savedIndicatorTimer: ReturnType<typeof setTimeout> | null = null
+
+export type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved'
 
 interface FlowState {
   // Data
@@ -17,6 +20,7 @@ interface FlowState {
   selectedNodeIds: string[]
   isDirty: boolean
   isLoading: boolean
+  saveStatus: SaveStatus
 
   // Actions
   loadFlows: (workspaceId: string) => Promise<void>
@@ -31,6 +35,7 @@ interface FlowState {
   saveFlow: () => Promise<void>
   createFlow: (workspaceId: string, name: string) => Promise<Flow>
   deleteFlow: (id: string) => Promise<void>
+  deleteSelected: () => void
 }
 
 export const useFlowStore = create<FlowState>()(
@@ -44,6 +49,7 @@ export const useFlowStore = create<FlowState>()(
       selectedNodeIds: [],
       isDirty: false,
       isLoading: false,
+      saveStatus: 'idle' as SaveStatus,
 
       loadFlows: async (workspaceId) => {
         const flows = await api.listFlows(workspaceId)
@@ -152,23 +158,45 @@ export const useFlowStore = create<FlowState>()(
         const state = get()
         if (!state.currentWorkflowId || !state.isDirty) return
 
-        const nodes = Object.values(state.nodes)
-        if (nodes.length > 0) {
-          await api.batchUpdateNodes(
-            nodes.map((n) => ({
-              id: n.id,
-              type: n.type,
-              label: n.label,
-              x: n.x,
-              y: n.y,
-              config: n.config ?? undefined
-            }))
-          )
-        }
-
         set((s) => {
-          s.isDirty = false
+          s.saveStatus = 'saving'
         })
+
+        try {
+          const nodes = Object.values(state.nodes)
+          if (nodes.length > 0) {
+            await api.batchUpdateNodes(
+              nodes.map((n) => ({
+                id: n.id,
+                type: n.type,
+                label: n.label,
+                x: n.x,
+                y: n.y,
+                config: n.config ?? undefined
+              }))
+            )
+          }
+
+          set((s) => {
+            s.isDirty = false
+            s.saveStatus = 'saved'
+          })
+
+          // Reset to idle after a brief "saved" display
+          if (savedIndicatorTimer) clearTimeout(savedIndicatorTimer)
+          savedIndicatorTimer = setTimeout(() => {
+            set((s) => {
+              if (s.saveStatus === 'saved') {
+                s.saveStatus = 'idle'
+              }
+            })
+          }, 2000)
+        } catch {
+          // Revert to dirty on failure so auto-save retries
+          set((s) => {
+            s.saveStatus = 'dirty'
+          })
+        }
       },
 
       createFlow: async (workspaceId, name) => {
@@ -189,6 +217,13 @@ export const useFlowStore = create<FlowState>()(
             s.edges = {}
           }
         })
+      },
+
+      deleteSelected: () => {
+        const state = get()
+        if (state.selectedNodeIds.length === 0) return
+        // removeNodes already handles cleaning up connected edges and selection
+        state.removeNodes(state.selectedNodeIds)
       }
     })),
     {
@@ -204,6 +239,7 @@ export const useFlowStore = create<FlowState>()(
 // Auto-save subscription
 useFlowStore.subscribe((state, prevState) => {
   if (state.isDirty && !prevState.isDirty) {
+    useFlowStore.setState({ saveStatus: 'dirty' })
     if (autoSaveTimer) clearTimeout(autoSaveTimer)
     autoSaveTimer = setTimeout(() => {
       useFlowStore.getState().saveFlow()

@@ -1,4 +1,4 @@
-import { Zap, Terminal, Globe, FileText, GitBranch } from 'lucide-react'
+import { Zap, Clock, Terminal, Globe, FileText, GitBranch, Plug } from 'lucide-react'
 import { ScrollArea } from '@shared/ui/scroll-area'
 import { NodePaletteItem } from './NodePaletteItem'
 
@@ -12,6 +12,13 @@ const paletteGroups = [
         description: 'Start workflow manually',
         icon: <Zap className="h-4 w-4 text-amber-500" />,
         defaultConfig: JSON.stringify({ triggerType: 'manual' }),
+      },
+      {
+        type: 'trigger',
+        label: 'Scheduled Trigger',
+        description: 'Run on a timed interval',
+        icon: <Clock className="h-4 w-4 text-amber-500" />,
+        defaultConfig: JSON.stringify({ triggerType: 'schedule', schedule: { intervalValue: 15, intervalUnit: 'minutes' } }),
       },
     ],
   },
@@ -38,6 +45,13 @@ const paletteGroups = [
         description: 'Read a file from disk',
         icon: <FileText className="h-4 w-4 text-blue-500" />,
         defaultConfig: JSON.stringify({ actionType: 'file.read', config: { path: '' } }),
+      },
+      {
+        type: 'action',
+        label: 'Plugin Action',
+        description: 'Run a plugin-provided action',
+        icon: <Plug className="h-4 w-4 text-blue-500" />,
+        defaultConfig: JSON.stringify({ actionType: 'plugin.action', config: { pluginId: '', actionId: '', params: {} } }),
       },
     ],
   },

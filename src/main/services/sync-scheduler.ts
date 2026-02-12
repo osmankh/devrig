@@ -2,6 +2,7 @@ import type { BrowserWindow } from 'electron'
 import type { PluginRepository } from '../db/repositories/plugin.repository'
 import type { PluginSyncRepository } from '../db/repositories/plugin-sync.repository'
 import type { InboxRepository } from '../db/repositories/inbox.repository'
+import type { PluginManager } from '../plugins/plugin-manager'
 
 interface SyncSchedulerDeps {
   plugin: PluginRepository
@@ -31,6 +32,7 @@ export class SyncScheduler {
   private unsnoozeTimerId: ReturnType<typeof setInterval> | null = null
   private repos: SyncSchedulerDeps
   private getMainWindow: () => BrowserWindow | null
+  private pluginManager: PluginManager | null = null
 
   constructor(
     repos: SyncSchedulerDeps,
@@ -38,6 +40,11 @@ export class SyncScheduler {
   ) {
     this.repos = repos
     this.getMainWindow = getMainWindow
+  }
+
+  /** Set the plugin manager reference (avoids circular dependency in construction). */
+  setPluginManager(pm: PluginManager): void {
+    this.pluginManager = pm
   }
 
   /** Start the scheduler. Call once at app startup. */
@@ -166,18 +173,34 @@ export class SyncScheduler {
     })
 
     try {
-      // TODO: Delegate to plugin sandbox for actual data fetching
-      // For now, just mark as complete
+      if (!this.pluginManager) {
+        throw new Error('PluginManager not set on SyncScheduler')
+      }
+
+      // Delegate to plugin sandbox to fetch data
+      const result = await this.pluginManager.callDataSource(pluginId, dataSourceId, 'sync')
+
+      // Extract item count from result if available
+      const itemsSynced = typeof result === 'object' && result !== null && 'itemsSynced' in result
+        ? (result as { itemsSynced: number }).itemsSynced
+        : 0
+
       this.repos.pluginSync.markComplete(pluginId, dataSourceId)
 
       mainWindow?.webContents.send('plugin:sync-complete', {
         pluginId,
         dataSourceId,
-        itemsSynced: 0
+        itemsSynced
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       this.repos.pluginSync.markError(pluginId, dataSourceId, message)
+
+      mainWindow?.webContents.send('plugin:sync-error', {
+        pluginId,
+        dataSourceId,
+        error: message
+      })
     }
   }
 

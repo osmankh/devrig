@@ -3,6 +3,7 @@ import { secureHandle } from '../ipc-security'
 import type { InboxRepository } from '../db/repositories/inbox.repository'
 import type { AiOperationsRepository } from '../db/repositories/ai-operations.repository'
 import type { AIProvider } from '../ai/provider-interface'
+import type { AIProviderRegistry } from '../ai/provider-registry'
 
 interface AIRepos {
   inbox: InboxRepository
@@ -19,7 +20,8 @@ function err(error: string, code = 'UNKNOWN') {
 
 export function registerAIHandlers(
   repos: AIRepos,
-  getProvider: () => AIProvider | null
+  getProvider: () => AIProvider | null,
+  registry: AIProviderRegistry
 ): void {
   secureHandle('ai:getProviders', () => {
     const provider = getProvider()
@@ -37,8 +39,12 @@ export function registerAIHandlers(
   secureHandle('ai:setProvider', (_e, providerId: unknown) => {
     const parsed = z.string().safeParse(providerId)
     if (!parsed.success) return err('Invalid provider id', 'VALIDATION')
-    // Stub: multi-provider selection will be handled by model router (task #7)
-    return ok(true)
+    try {
+      registry.setDefault(parsed.data)
+      return ok(true)
+    } catch (error) {
+      return err(error instanceof Error ? error.message : 'Failed to set provider', 'SET_PROVIDER_FAILED')
+    }
   })
 
   secureHandle('ai:classify', async (_e, itemIds: unknown) => {

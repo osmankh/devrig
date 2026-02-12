@@ -34,3 +34,11 @@ export { Skeleton } from './skeleton'
 export { Label } from './label'
 export { Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectItem } from './select'
 export { Textarea } from './textarea'
+export {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuGroup
+} from './context-menu'

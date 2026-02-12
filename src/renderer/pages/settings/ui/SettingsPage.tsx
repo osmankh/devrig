@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react'
-import { Tabs, TabsList, TabsTrigger, TabsContent, Separator, Button, Input, Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@shared/ui'
+import { useState, useEffect, useCallback } from 'react'
+import { RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
+import { Tabs, TabsList, TabsTrigger, TabsContent, Separator, Button, Input, Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Badge } from '@shared/ui'
 import { useUIStore } from '@app/stores/ui-store'
 import { useShortcutStore, formatShortcut } from '@features/keyboard-shortcuts'
+import { usePluginStore } from '@entities/plugin'
 import { ipcInvoke } from '@shared/lib/ipc'
 
 type SettingsTab = 'general' | 'ai' | 'plugins' | 'connections' | 'shortcuts' | 'about'
@@ -252,13 +255,182 @@ function PluginSettings() {
 }
 
 function ConnectionSettings() {
+  const plugins = usePluginStore((s) => s.plugins)
+  const syncStates = usePluginStore((s) => s.syncStates)
+  const loadPlugins = usePluginStore((s) => s.loadPlugins)
+  const configurePlugin = usePluginStore((s) => s.configurePlugin)
+  const triggerSync = usePluginStore((s) => s.triggerSync)
+  const loadSyncState = usePluginStore((s) => s.loadSyncState)
+
+  const [apiKeys, setApiKeys] = useState<Record<string, string>>({})
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [syncingId, setSyncingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    loadPlugins()
+  }, [loadPlugins])
+
+  const pluginList = Object.values(plugins)
+
+  // Load sync states for all plugins
+  useEffect(() => {
+    for (const p of pluginList) {
+      loadSyncState(p.id)
+    }
+  }, [pluginList.length, loadSyncState])
+
+  const getPluginSyncStatus = useCallback(
+    (pluginId: string): 'connected' | 'syncing' | 'error' | 'not_configured' => {
+      const states = Object.entries(syncStates)
+        .filter(([key]) => key.startsWith(`${pluginId}:`))
+        .map(([, state]) => state)
+
+      if (states.length === 0) return 'not_configured'
+      if (states.some((s) => s.syncStatus === 'error')) return 'error'
+      if (states.some((s) => s.syncStatus === 'syncing')) return 'syncing'
+      if (states.some((s) => s.lastSyncAt)) return 'connected'
+      return 'not_configured'
+    },
+    [syncStates],
+  )
+
+  const getLastSyncTime = useCallback(
+    (pluginId: string): string | null => {
+      const states = Object.entries(syncStates)
+        .filter(([key]) => key.startsWith(`${pluginId}:`))
+        .map(([, state]) => state)
+        .filter((s) => s.lastSyncAt)
+        .sort((a, b) => new Date(b.lastSyncAt!).getTime() - new Date(a.lastSyncAt!).getTime())
+
+      if (states.length === 0) return null
+      const date = new Date(states[0].lastSyncAt!)
+      return date.toLocaleString()
+    },
+    [syncStates],
+  )
+
+  const handleSaveApiKey = async (pluginId: string) => {
+    const key = apiKeys[pluginId]
+    if (!key?.trim()) return
+    setSavingId(pluginId)
+    try {
+      await configurePlugin(pluginId, { apiKey: key.trim() })
+      setApiKeys((prev) => ({ ...prev, [pluginId]: '' }))
+      toast.success('API key saved', { description: 'Connection configured securely.' })
+    } catch {
+      toast.error('Failed to save API key')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  const handleSync = async (pluginId: string) => {
+    setSyncingId(pluginId)
+    try {
+      await triggerSync(pluginId)
+      toast.success('Sync triggered')
+    } catch {
+      toast.error('Failed to trigger sync')
+    } finally {
+      setSyncingId(null)
+    }
+  }
+
+  const statusBadge = (status: ReturnType<typeof getPluginSyncStatus>) => {
+    switch (status) {
+      case 'connected':
+        return <Badge className="bg-[var(--color-success)]/15 text-[var(--color-success)] border-0">Connected</Badge>
+      case 'syncing':
+        return <Badge className="bg-[var(--color-accent-primary)]/15 text-[var(--color-accent-primary)] border-0">Syncing</Badge>
+      case 'error':
+        return <Badge className="bg-[var(--color-danger)]/15 text-[var(--color-danger)] border-0">Error</Badge>
+      case 'not_configured':
+        return <Badge variant="outline" className="text-[var(--color-text-tertiary)]">Not configured</Badge>
+    }
+  }
+
   return (
     <div className="max-w-lg">
       <SectionTitle>Service Connections</SectionTitle>
-      <p className="text-[var(--text-sm)] text-[var(--color-text-tertiary)]">
-        Manage OAuth connections and API keys for your plugins. Each plugin
-        manages its own authentication through its settings.
+      <p className="mb-4 text-[var(--text-sm)] text-[var(--color-text-tertiary)]">
+        Manage API keys and sync status for your installed plugins. Keys are stored securely using system keychain.
       </p>
+
+      {pluginList.length === 0 ? (
+        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-subtle)] p-6 text-center">
+          <p className="text-[var(--text-sm)] text-[var(--color-text-tertiary)]">
+            No plugins installed. Visit the marketplace to install plugins.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {pluginList.map((plugin) => {
+            const status = getPluginSyncStatus(plugin.id)
+            const lastSync = getLastSyncTime(plugin.id)
+            const isSaving = savingId === plugin.id
+            const isSyncing = syncingId === plugin.id
+
+            return (
+              <div
+                key={plugin.id}
+                className="rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] p-4"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[var(--text-sm)] font-medium text-[var(--color-text-primary)]">
+                        {plugin.name}
+                      </p>
+                      {statusBadge(status)}
+                    </div>
+                    <p className="mt-0.5 text-[var(--text-xs)] text-[var(--color-text-tertiary)]">
+                      v{plugin.version}
+                      {lastSync && ` \u00b7 Last synced: ${lastSync}`}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    disabled={isSyncing || !plugin.enabled}
+                    onClick={() => handleSync(plugin.id)}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+
+                {plugin.enabled && (
+                  <div className="mt-3 flex gap-2">
+                    <Input
+                      type="password"
+                      placeholder="Enter API key..."
+                      value={apiKeys[plugin.id] ?? ''}
+                      onChange={(e) =>
+                        setApiKeys((prev) => ({ ...prev, [plugin.id]: e.target.value }))
+                      }
+                      className="h-8 flex-1 text-[var(--text-xs)]"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!apiKeys[plugin.id]?.trim() || isSaving}
+                      onClick={() => handleSaveApiKey(plugin.id)}
+                    >
+                      {isSaving ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                )}
+
+                {!plugin.enabled && (
+                  <p className="mt-2 text-[var(--text-xs)] text-[var(--color-text-quaternary)]">
+                    Enable this plugin in the Plugins tab to configure its connection.
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

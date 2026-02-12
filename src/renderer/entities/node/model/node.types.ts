@@ -1,8 +1,13 @@
 export type NodeType = 'trigger' | 'action' | 'condition'
 
-export type TriggerType = 'manual'
+export type TriggerType = 'manual' | 'schedule'
 
-export type ActionType = 'shell.exec' | 'http.request' | 'file.read'
+export interface ScheduleConfig {
+  intervalValue: number
+  intervalUnit: 'minutes' | 'hours' | 'days'
+}
+
+export type ActionType = 'shell.exec' | 'http.request' | 'file.read' | 'plugin.action'
 
 export interface ShellExecConfig {
   command: string
@@ -23,7 +28,13 @@ export interface FileReadConfig {
   encoding?: string
 }
 
-export type ActionConfig = ShellExecConfig | HttpRequestConfig | FileReadConfig
+export interface PluginActionConfig {
+  pluginId: string
+  actionId: string
+  params?: Record<string, unknown>
+}
+
+export type ActionConfig = ShellExecConfig | HttpRequestConfig | FileReadConfig | PluginActionConfig
 
 export interface CompareCondition {
   type: 'compare'
@@ -32,7 +43,17 @@ export interface CompareCondition {
   right: ValueRef
 }
 
-export type ConditionExpression = CompareCondition
+export interface AndCondition {
+  type: 'and'
+  conditions: ConditionExpression[]
+}
+
+export interface OrCondition {
+  type: 'or'
+  conditions: ConditionExpression[]
+}
+
+export type ConditionExpression = CompareCondition | AndCondition | OrCondition
 
 export type ValueRef =
   | { type: 'literal'; value: string | number | boolean }
@@ -41,6 +62,7 @@ export type ValueRef =
 
 export interface TriggerNodeConfig {
   triggerType: TriggerType
+  schedule?: ScheduleConfig
 }
 
 export interface ActionNodeConfig {

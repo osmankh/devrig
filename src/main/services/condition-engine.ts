@@ -14,7 +14,25 @@ const compareConditionSchema = z.object({
   right: valueRefSchema,
 })
 
-const conditionSchema = compareConditionSchema // MVP: only compare
+// Recursive schema for compound conditions (AND/OR)
+type ConditionInput =
+  | z.infer<typeof compareConditionSchema>
+  | { type: 'and'; conditions: ConditionInput[] }
+  | { type: 'or'; conditions: ConditionInput[] }
+
+const conditionSchema: z.ZodType<ConditionInput> = z.lazy(() =>
+  z.union([
+    compareConditionSchema,
+    z.object({
+      type: z.literal('and'),
+      conditions: z.array(conditionSchema).min(1),
+    }),
+    z.object({
+      type: z.literal('or'),
+      conditions: z.array(conditionSchema).min(1),
+    }),
+  ]),
+)
 
 export type ExecutionContext = {
   nodes: Record<string, { output: unknown }>
@@ -63,11 +81,23 @@ function compareValues(left: unknown, right: unknown, operator: string): boolean
   }
 }
 
+function evaluateRecursive(parsed: ConditionInput, context: ExecutionContext): boolean {
+  switch (parsed.type) {
+    case 'compare': {
+      const left = resolveValueRef(parsed.left, context)
+      const right = resolveValueRef(parsed.right, context)
+      return compareValues(left, right, parsed.operator)
+    }
+    case 'and':
+      return parsed.conditions.every((c) => evaluateRecursive(c, context))
+    case 'or':
+      return parsed.conditions.some((c) => evaluateRecursive(c, context))
+  }
+}
+
 export function evaluateCondition(expression: unknown, context: ExecutionContext): boolean {
   const parsed = conditionSchema.parse(expression)
-  const left = resolveValueRef(parsed.left, context)
-  const right = resolveValueRef(parsed.right, context)
-  return compareValues(left, right, parsed.operator)
+  return evaluateRecursive(parsed, context)
 }
 
 export function validateCondition(expression: unknown): boolean {

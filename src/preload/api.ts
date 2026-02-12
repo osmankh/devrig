@@ -39,6 +39,7 @@ const INVOKE_CHANNELS = [
   'db:settings:get',
   'db:settings:set',
   // Execution control
+  'execution:validate',
   'execution:run',
   'execution:cancel',
   // Inbox

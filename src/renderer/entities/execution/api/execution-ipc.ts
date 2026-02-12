@@ -1,6 +1,16 @@
 import { ipcInvoke, ipcOn, ipcOff } from '@shared/lib/ipc'
 
 // Types
+export interface ValidationError {
+  nodeId?: string
+  message: string
+}
+
+export interface ValidationResult {
+  valid: boolean
+  errors: ValidationError[]
+}
+
 export interface Execution {
   id: string
   workflowId: string
@@ -45,6 +55,10 @@ export async function getExecutionWithSteps(id: string): Promise<ExecutionWithSt
   const result = await ipcInvoke<{ data?: ExecutionWithSteps; error?: string }>('db:execution:getWithSteps', id)
   if (result.error) throw new Error(result.error)
   return result.data!
+}
+
+export async function validateWorkflow(workflowId: string): Promise<ValidationResult> {
+  return ipcInvoke<ValidationResult>('execution:validate', { workflowId })
 }
 
 export async function runWorkflow(workflowId: string): Promise<{ executionId: string }> {

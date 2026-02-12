@@ -1,6 +1,7 @@
 import { executeShell } from './shell-executor'
 import { executeHttp } from './http-executor'
 import { executeFileRead } from './file-executor'
+import { executePluginAction } from './plugin-executor'
 
 export interface ActionResult {
   success: boolean
@@ -26,6 +27,7 @@ const registry: Record<string, ActionExecutor> = {
     path: config.path as string,
     encoding: config.encoding as BufferEncoding | undefined,
   }),
+  'plugin.action': (config) => executePluginAction(config),
 }
 
 export function executeAction(type: string, config: Record<string, unknown>): Promise<ActionResult> {

@@ -24,6 +24,7 @@ import { registerInboxHandlers } from './ipc/inbox-handlers'
 import { registerPluginHandlers } from './ipc/plugin-handlers'
 import { registerAIHandlers } from './ipc/ai-handlers'
 import { SyncScheduler } from './services/sync-scheduler'
+import { TriggerScheduler } from './services/trigger-scheduler'
 import {
   AIProviderRegistry,
   ClaudeProvider,
@@ -33,9 +34,11 @@ import {
   PipelineEngine
 } from './ai'
 import { PluginManager } from './plugins'
+import { setPluginManager as setPluginActionManager } from './services/actions/plugin-executor'
 
 let mainWindow: BrowserWindow | null = null
 let syncScheduler: SyncScheduler | null = null
+let triggerScheduler: TriggerScheduler | null = null
 let pluginManager: PluginManager | null = null
 
 function createWindow(): void {
@@ -122,14 +125,6 @@ function initDatabase(): void {
   registerDbHandlers(repos)
   registerExecutionHandlers(repos, () => mainWindow)
 
-  // Phase 2 handlers
-  registerInboxHandlers(inbox)
-  registerPluginHandlers({ plugin, pluginSync, inbox })
-  registerAIHandlers(
-    { inbox, aiOperations },
-    () => registry.getDefault() ?? null
-  )
-
   // Pipeline engine
   const pipelineEngine = new PipelineEngine()
 
@@ -141,13 +136,32 @@ function initDatabase(): void {
   pluginManager.initialize().catch((err) => {
     console.error('[plugin-manager] Failed to initialize:', err)
   })
+  setPluginActionManager(pluginManager)
 
   // Sync scheduler
   syncScheduler = new SyncScheduler(
     { plugin, pluginSync, inbox },
     () => mainWindow
   )
+  syncScheduler.setPluginManager(pluginManager)
   syncScheduler.start()
+
+  // Phase 2 handlers
+  registerInboxHandlers(inbox)
+  registerPluginHandlers({ plugin, pluginSync, inbox }, { pluginManager, syncScheduler })
+  registerAIHandlers(
+    { inbox, aiOperations },
+    () => registry.getDefault() ?? null,
+    registry
+  )
+
+  // Trigger scheduler (interval-based workflow execution)
+  triggerScheduler = new TriggerScheduler(
+    db,
+    { workflow: repos.workflow, execution: repos.execution },
+    () => mainWindow
+  )
+  triggerScheduler.start()
 }
 
 app.whenReady().then(() => {
@@ -165,6 +179,7 @@ app.whenReady().then(() => {
 })
 
 app.on('before-quit', () => {
+  triggerScheduler?.stop()
   syncScheduler?.stop()
   pluginManager?.dispose()
   closeDatabase()

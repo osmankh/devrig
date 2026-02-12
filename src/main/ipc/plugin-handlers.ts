@@ -3,11 +3,18 @@ import { secureHandle } from '../ipc-security'
 import type { PluginRepository } from '../db/repositories/plugin.repository'
 import type { PluginSyncRepository } from '../db/repositories/plugin-sync.repository'
 import type { InboxRepository } from '../db/repositories/inbox.repository'
+import type { PluginManager } from '../plugins/plugin-manager'
+import type { SyncScheduler } from '../services/sync-scheduler'
 
 interface PluginRepos {
   plugin: PluginRepository
   pluginSync: PluginSyncRepository
   inbox: InboxRepository
+}
+
+interface PluginServices {
+  pluginManager: PluginManager
+  syncScheduler: SyncScheduler
 }
 
 function ok<T>(data: T) {
@@ -18,7 +25,7 @@ function err(error: string, code = 'UNKNOWN') {
   return { error, code }
 }
 
-export function registerPluginHandlers(repos: PluginRepos): void {
+export function registerPluginHandlers(repos: PluginRepos, services: PluginServices): void {
   secureHandle('plugin:list', () => {
     return ok(repos.plugin.list())
   })
@@ -31,11 +38,15 @@ export function registerPluginHandlers(repos: PluginRepos): void {
     return ok(result)
   })
 
-  secureHandle('plugin:install', (_e, path: unknown) => {
+  secureHandle('plugin:install', async (_e, path: unknown) => {
     const parsed = z.string().safeParse(path)
     if (!parsed.success) return err('Invalid path', 'VALIDATION')
-    // Stub: actual plugin installation will be handled by PluginManager (task #6)
-    return err('Plugin installation not yet implemented', 'NOT_IMPLEMENTED')
+    try {
+      const descriptor = await services.pluginManager.install(parsed.data)
+      return ok({ id: descriptor.id, name: descriptor.name, version: descriptor.version })
+    } catch (error) {
+      return err(error instanceof Error ? error.message : 'Plugin installation failed', 'INSTALL_FAILED')
+    }
   })
 
   secureHandle('plugin:uninstall', (_e, id: unknown) => {
@@ -88,10 +99,14 @@ export function registerPluginHandlers(repos: PluginRepos): void {
     return ok(repos.pluginSync.listByPlugin(parsed.data))
   })
 
-  secureHandle('plugin:triggerSync', (_e, id: unknown) => {
+  secureHandle('plugin:triggerSync', async (_e, id: unknown) => {
     const parsed = z.string().safeParse(id)
     if (!parsed.success) return err('Invalid plugin id', 'VALIDATION')
-    // Stub: actual sync triggering will be handled by SyncScheduler
-    return err('Manual sync not yet implemented', 'NOT_IMPLEMENTED')
+    try {
+      await services.syncScheduler.triggerSync(parsed.data)
+      return ok(true)
+    } catch (error) {
+      return err(error instanceof Error ? error.message : 'Sync trigger failed', 'SYNC_FAILED')
+    }
   })
 }
