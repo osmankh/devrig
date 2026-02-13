@@ -1,5 +1,25 @@
-import { app, BrowserWindow, nativeTheme } from 'electron'
-import { join } from 'path'
+import { app, BrowserWindow, dialog, nativeTheme } from 'electron'
+import { readFileSync } from 'fs'
+import { join, join as pathJoin } from 'path'
+
+// Load .env in development
+if (!app.isPackaged) {
+  try {
+    const envPath = pathJoin(app.getAppPath(), '.env')
+    const envContent = readFileSync(envPath, 'utf-8')
+    for (const line of envContent.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const eqIndex = trimmed.indexOf('=')
+      if (eqIndex === -1) continue
+      const key = trimmed.slice(0, eqIndex).trim()
+      const value = trimmed.slice(eqIndex + 1).trim()
+      if (key && !(key in process.env)) {
+        process.env[key] = value
+      }
+    }
+  } catch { /* .env file not found — OK */ }
+}
 import { enforceCSP } from './csp'
 import { configurePermissions } from './permissions'
 import { configureNavigationGuards } from './navigation-guard'
@@ -35,11 +55,14 @@ import {
 } from './ai'
 import { PluginManager } from './plugins'
 import { setPluginManager as setPluginActionManager } from './services/actions/plugin-executor'
+import { OAuthOrchestrator, TokenRefreshService } from './auth'
+import { registerOAuthHandlers } from './ipc/oauth-handlers'
 
 let mainWindow: BrowserWindow | null = null
 let syncScheduler: SyncScheduler | null = null
 let triggerScheduler: TriggerScheduler | null = null
 let pluginManager: PluginManager | null = null
+let tokenRefreshService: TokenRefreshService | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -84,6 +107,11 @@ function registerSystemHandlers(): void {
   secureHandle('theme:get-native-theme', () => {
     return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
   })
+
+  secureHandle('system:showOpenDialog', async (_e: unknown, options: Electron.OpenDialogOptions) => {
+    const result = await dialog.showOpenDialog(options)
+    return result
+  })
 }
 
 function initDatabase(): void {
@@ -121,6 +149,12 @@ function initDatabase(): void {
   modelRouter.setRoute('draft', 'claude', 'claude-sonnet-4-5')
   modelRouter.setRoute('general', 'claude', 'claude-sonnet-4-5')
 
+  // OAuth
+  const oauthOrchestrator = new OAuthOrchestrator(secretsBridge)
+  tokenRefreshService = new TokenRefreshService(oauthOrchestrator)
+  registerOAuthHandlers(oauthOrchestrator)
+  tokenRefreshService.start()
+
   // Phase 1 handlers
   registerDbHandlers(repos)
   registerExecutionHandlers(repos, () => mainWindow)
@@ -131,7 +165,14 @@ function initDatabase(): void {
   // Plugin manager
   pluginManager = new PluginManager({
     db,
-    pluginsDir: join(app.getPath('userData'), 'plugins')
+    pluginsDir: join(app.getPath('userData'), 'plugins'),
+    secretsBridge,
+    aiRegistry: {
+      getDefault() {
+        const provider = registry.getDefault()
+        return provider ?? null
+      }
+    }
   })
   pluginManager.initialize().catch((err) => {
     console.error('[plugin-manager] Failed to initialize:', err)
@@ -144,15 +185,21 @@ function initDatabase(): void {
     () => mainWindow
   )
   syncScheduler.setPluginManager(pluginManager)
+  syncScheduler.setAIRegistry(registry)
+  syncScheduler.setAiOpsRepo(aiOperations)
   syncScheduler.start()
 
   // Phase 2 handlers
   registerInboxHandlers(inbox)
-  registerPluginHandlers({ plugin, pluginSync, inbox }, { pluginManager, syncScheduler })
+  registerPluginHandlers(
+    { plugin, pluginSync, inbox, settings: repos.settings },
+    { pluginManager, syncScheduler, secretsBridge }
+  )
   registerAIHandlers(
     { inbox, aiOperations },
     () => registry.getDefault() ?? null,
-    registry
+    registry,
+    secretsBridge
   )
 
   // Trigger scheduler (interval-based workflow execution)
@@ -179,6 +226,7 @@ app.whenReady().then(() => {
 })
 
 app.on('before-quit', () => {
+  tokenRefreshService?.stop()
   triggerScheduler?.stop()
   syncScheduler?.stop()
   pluginManager?.dispose()

@@ -2,7 +2,9 @@ import type { BrowserWindow } from 'electron'
 import type { PluginRepository } from '../db/repositories/plugin.repository'
 import type { PluginSyncRepository } from '../db/repositories/plugin-sync.repository'
 import type { InboxRepository } from '../db/repositories/inbox.repository'
+import type { AiOperationsRepository } from '../db/repositories/ai-operations.repository'
 import type { PluginManager } from '../plugins/plugin-manager'
+import type { AIProviderRegistry } from '../ai/provider-registry'
 
 interface SyncSchedulerDeps {
   plugin: PluginRepository
@@ -33,6 +35,8 @@ export class SyncScheduler {
   private repos: SyncSchedulerDeps
   private getMainWindow: () => BrowserWindow | null
   private pluginManager: PluginManager | null = null
+  private aiRegistry: AIProviderRegistry | null = null
+  private aiOpsRepo: AiOperationsRepository | null = null
 
   constructor(
     repos: SyncSchedulerDeps,
@@ -45,6 +49,14 @@ export class SyncScheduler {
   /** Set the plugin manager reference (avoids circular dependency in construction). */
   setPluginManager(pm: PluginManager): void {
     this.pluginManager = pm
+  }
+
+  setAIRegistry(registry: AIProviderRegistry): void {
+    this.aiRegistry = registry
+  }
+
+  setAiOpsRepo(repo: AiOperationsRepository): void {
+    this.aiOpsRepo = repo
   }
 
   /** Start the scheduler. Call once at app startup. */
@@ -187,6 +199,11 @@ export class SyncScheduler {
 
       this.repos.pluginSync.markComplete(pluginId, dataSourceId)
 
+      // Run post-sync classification (non-blocking, failures don't affect sync)
+      this.runPostSyncClassification(pluginId).catch((err) => {
+        console.warn('[sync-scheduler] Post-sync classification failed:', err)
+      })
+
       mainWindow?.webContents.send('plugin:sync-complete', {
         pluginId,
         dataSourceId,
@@ -201,6 +218,63 @@ export class SyncScheduler {
         dataSourceId,
         error: message
       })
+    }
+  }
+
+  private async runPostSyncClassification(pluginId: string): Promise<void> {
+    if (!this.aiRegistry || !this.aiOpsRepo) return
+
+    const provider = this.aiRegistry.getDefault()
+    if (!provider) return
+
+    // Check if provider is available (has API key)
+    const available = await provider.isAvailable()
+    if (!available) return
+
+    // Find unclassified items for this plugin
+    const items = this.repos.inbox.list({ pluginId, limit: 50 })
+    const unclassified = items.filter((item) => !item.aiClassification)
+    if (unclassified.length === 0) return
+
+    try {
+      const startMs = Date.now()
+      const response = await provider.classify({
+        items: unclassified.map((item) => ({
+          id: item.id,
+          title: item.title,
+          body: item.body ?? undefined,
+          preview: item.preview ?? undefined
+        })),
+        labels: ['important', 'needs_response', 'fyi', 'noise']
+      })
+      const durationMs = Date.now() - startMs
+
+      // Update items with classification results
+      for (const result of response.results) {
+        this.repos.inbox.update(result.itemId, {
+          aiClassification: JSON.stringify({
+            label: result.label,
+            confidence: result.confidence,
+            reasoning: result.reasoning
+          })
+        })
+      }
+
+      // Track AI operation
+      this.aiOpsRepo.create({
+        provider: provider.id,
+        model: response.model,
+        operation: 'classify',
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        durationMs
+      })
+
+      // Notify renderer
+      const mainWindow = this.getMainWindow()
+      mainWindow?.webContents.send('inbox:updated', { classified: unclassified.length })
+    } catch (err) {
+      console.warn('[sync-scheduler] Classification error:', err)
     }
   }
 

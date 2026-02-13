@@ -7,6 +7,7 @@ interface PluginState {
   plugins: Record<string, Plugin>
   syncStates: Record<string, PluginSyncState> // key: `${pluginId}:${dataSourceId}`
   isLoading: boolean
+  showSetupWizard: string | null
 
   loadPlugins: () => Promise<void>
   installPlugin: (path: string) => Promise<void>
@@ -16,13 +17,19 @@ interface PluginState {
   configurePlugin: (id: string, settings: Record<string, unknown>) => Promise<void>
   triggerSync: (id: string) => Promise<void>
   loadSyncState: (id: string) => Promise<void>
+  setShowSetupWizard: (pluginId: string | null) => void
 }
 
 export const usePluginStore = create<PluginState>()(
-  immer((set) => ({
+  immer((set, get) => ({
     plugins: {},
     syncStates: {},
     isLoading: false,
+    showSetupWizard: null,
+
+    setShowSetupWizard: (pluginId) => {
+      set((s) => { s.showSetupWizard = pluginId })
+    },
 
     loadPlugins: async () => {
       set((s) => {
@@ -74,6 +81,16 @@ export const usePluginStore = create<PluginState>()(
       })
       try {
         await api.enablePlugin(id)
+        // Check if plugin needs setup
+        const plugin = get().plugins[id]
+        if (plugin?.requiredSecrets && plugin.requiredSecrets.length > 0) {
+          const results = await Promise.all(
+            plugin.requiredSecrets.map((key) => api.hasPluginSecret(id, key))
+          )
+          if (results.some((has) => !has)) {
+            set((s) => { s.showSetupWizard = id })
+          }
+        }
       } catch {
         set((s) => {
           if (s.plugins[id]) s.plugins[id].enabled = false

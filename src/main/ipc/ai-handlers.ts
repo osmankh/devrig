@@ -4,6 +4,7 @@ import type { InboxRepository } from '../db/repositories/inbox.repository'
 import type { AiOperationsRepository } from '../db/repositories/ai-operations.repository'
 import type { AIProvider } from '../ai/provider-interface'
 import type { AIProviderRegistry } from '../ai/provider-registry'
+import type { SecretsBridge } from '../ai/secrets-bridge'
 
 interface AIRepos {
   inbox: InboxRepository
@@ -21,7 +22,8 @@ function err(error: string, code = 'UNKNOWN') {
 export function registerAIHandlers(
   repos: AIRepos,
   getProvider: () => AIProvider | null,
-  registry: AIProviderRegistry
+  registry: AIProviderRegistry,
+  secretsBridge: SecretsBridge
 ): void {
   secureHandle('ai:getProviders', () => {
     const provider = getProvider()
@@ -237,5 +239,47 @@ export function registerAIHandlers(
     }
 
     return ok({ total, byProvider })
+  })
+
+  secureHandle('ai:setApiKey', (_e, providerId: unknown, apiKey: unknown) => {
+    const id = z.string().safeParse(providerId)
+    const key = z.string().min(1).safeParse(apiKey)
+    if (!id.success || !key.success) return err('Invalid data', 'VALIDATION')
+    try {
+      secretsBridge.setProviderKey(id.data, key.data)
+      // Reset the provider client so it picks up the new key
+      const provider = registry.get(id.data)
+      if (provider && 'resetClient' in provider) {
+        (provider as { resetClient: () => void }).resetClient()
+      }
+      return ok(true)
+    } catch (error) {
+      return err(error instanceof Error ? error.message : 'Failed to save API key', 'SAVE_FAILED')
+    }
+  })
+
+  secureHandle('ai:hasApiKey', (_e, providerId: unknown) => {
+    const id = z.string().safeParse(providerId)
+    if (!id.success) return err('Invalid provider id', 'VALIDATION')
+    return ok(secretsBridge.hasProviderKey(id.data))
+  })
+
+  secureHandle('ai:testConnection', async (_e, providerId: unknown) => {
+    const id = z.string().safeParse(providerId)
+    if (!id.success) return err('Invalid provider id', 'VALIDATION')
+    const provider = registry.get(id.data)
+    if (!provider) return err('Provider not found', 'NOT_FOUND')
+    try {
+      const available = await provider.isAvailable()
+      if (!available) return ok({ success: false, error: 'API key not configured' })
+      // Try a minimal classify call to verify the key works
+      await provider.classify({
+        items: [{ id: 'test', title: 'Test connection' }],
+        labels: ['test']
+      })
+      return ok({ success: true })
+    } catch (error) {
+      return ok({ success: false, error: error instanceof Error ? error.message : 'Connection test failed' })
+    }
   })
 }

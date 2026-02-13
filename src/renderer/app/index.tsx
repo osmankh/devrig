@@ -10,7 +10,9 @@ import { initExecutionSubscriptions } from '@entities/execution'
 import { CommandPalette } from '@widgets/command-palette'
 import { initKeyboardShortcuts, useShortcutStore } from '@features/keyboard-shortcuts'
 import { OnboardingDialog } from '@features/onboarding'
+import { PluginSetupWizard } from '@features/plugin-onboarding/ui/PluginSetupWizard'
 import { useNotifications } from '@features/notifications'
+import { usePluginStore } from '@entities/plugin'
 
 // Apply bootstrap cache before React renders
 loadTier1()
@@ -46,6 +48,10 @@ function useRegisterNavShortcuts() {
 
 export function App() {
   const theme = useUIStore((s) => s.theme)
+  const showSetupWizard = usePluginStore((s) => s.showSetupWizard)
+  const plugins = usePluginStore((s) => s.plugins)
+  const setShowSetupWizard = usePluginStore((s) => s.setShowSetupWizard)
+  const wizardPlugin = showSetupWizard ? plugins[showSetupWizard] : null
 
   useEffect(() => {
     loadTier2()
@@ -78,6 +84,13 @@ export function App() {
         <CommandPalette />
         <OnboardingDialog />
         <Toaster />
+        {wizardPlugin && (
+          <PluginSetupWizard
+            plugin={wizardPlugin}
+            open={!!showSetupWizard}
+            onClose={() => setShowSetupWizard(null)}
+          />
+        )}
       </TooltipProvider>
     </ThemeProvider>
   )

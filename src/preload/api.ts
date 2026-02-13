@@ -4,6 +4,7 @@ const INVOKE_CHANNELS = [
   // System
   'system:getAppVersion',
   'system:getPlatform',
+  'system:showOpenDialog',
   'theme:get-native-theme',
   // Workspace
   'db:workspace:list',
@@ -61,6 +62,10 @@ const INVOKE_CHANNELS = [
   'plugin:configure',
   'plugin:getSyncState',
   'plugin:triggerSync',
+  'plugin:setSecret',
+  'plugin:hasSecret',
+  'plugin:getSettings',
+  'plugin:setSetting',
   // AI
   'ai:getProviders',
   'ai:setProvider',
@@ -68,7 +73,17 @@ const INVOKE_CHANNELS = [
   'ai:summarize',
   'ai:draft',
   'ai:complete',
-  'ai:getUsage'
+  'ai:getUsage',
+  'ai:setApiKey',
+  'ai:hasApiKey',
+  'ai:testConnection',
+  // OAuth
+  'oauth:supports',
+  'oauth:start',
+  'oauth:poll',
+  'oauth:status',
+  'oauth:disconnect',
+  'oauth:refresh'
 ] as const
 
 const LISTEN_CHANNELS = [
@@ -81,8 +96,11 @@ const LISTEN_CHANNELS = [
   // Plugin sync
   'plugin:sync-progress',
   'plugin:sync-complete',
+  'plugin:sync-error',
   // AI pipeline
-  'ai:pipeline-progress'
+  'ai:pipeline-progress',
+  // OAuth
+  'oauth:callback-received'
 ] as const
 
 type InvokeChannel = (typeof INVOKE_CHANNELS)[number]

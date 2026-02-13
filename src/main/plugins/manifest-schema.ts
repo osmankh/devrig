@@ -84,7 +84,12 @@ export const pluginManifestSchema = z.object({
   capabilities: capabilitiesSchema.optional(),
 
   minAppVersion: z.string().regex(semverRegex).optional(),
-  maxAppVersion: z.string().regex(semverRegex).optional()
+  maxAppVersion: z.string().regex(semverRegex).optional(),
+
+  auth: z.object({
+    type: z.enum(['oauth', 'api_key', 'none']).default('api_key'),
+    providerId: z.string().optional()
+  }).optional()
 })
 
 export type PluginManifest = z.infer<typeof pluginManifestSchema>
@@ -97,6 +102,7 @@ export type ViewCapability = z.infer<typeof viewSchema>
 export type FlowNodeCapability = z.infer<typeof flowNodeSchema>
 export type ManifestPermissions = z.infer<typeof permissionsSchema>
 export type ManifestCapabilities = z.infer<typeof capabilitiesSchema>
+export type PluginAuth = z.infer<typeof pluginManifestSchema>['auth']
 
 export function validateManifest(json: unknown): {
   success: true

@@ -18,6 +18,8 @@ export interface Plugin {
   installedAt: Timestamp
   updatedAt: Timestamp
   capabilities: PluginCapabilities
+  requiredSecrets?: string[]
+  authType?: 'oauth' | 'api_key' | 'none'
 }
 
 export interface PluginSyncState {

@@ -5,10 +5,22 @@ import { Separator } from '@shared/ui'
 import { SidebarWorkspaceNav } from './SidebarWorkspaceNav'
 import { SidebarFlowList } from './SidebarFlowList'
 
+type NavView = 'inbox' | 'dashboard' | 'execution-history' | 'settings' | 'marketplace'
+
+function navButtonClass(currentView: string, targetView: NavView) {
+  const base =
+    'flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-[var(--text-sm)]'
+  if (currentView === targetView) {
+    return `${base} bg-[var(--color-bg-hover)] text-[var(--color-text-primary)] font-medium`
+  }
+  return `${base} text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]`
+}
+
 export function Sidebar() {
   const collapsed = useUIStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const navigate = useRouterStore((s) => s.navigate)
+  const currentView = useRouterStore((s) => s.route.view)
 
   return (
     <motion.aside
@@ -41,7 +53,7 @@ export function Sidebar() {
           <nav className="flex flex-col gap-0.5 px-3 py-2">
             <button
               onClick={() => navigate({ view: 'inbox' })}
-              className="flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-[var(--text-sm)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+              className={navButtonClass(currentView, 'inbox')}
             >
               <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
                 <rect
@@ -65,7 +77,7 @@ export function Sidebar() {
             </button>
             <button
               onClick={() => navigate({ view: 'dashboard' })}
-              className="flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-[var(--text-sm)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+              className={navButtonClass(currentView, 'dashboard')}
             >
               <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
                 <rect
@@ -109,7 +121,7 @@ export function Sidebar() {
             </button>
             <button
               onClick={() => navigate({ view: 'execution-history' })}
-              className="flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-[var(--text-sm)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+              className={navButtonClass(currentView, 'execution-history')}
             >
               <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
                 <circle
@@ -130,7 +142,7 @@ export function Sidebar() {
             </button>
             <button
               onClick={() => navigate({ view: 'settings' })}
-              className="flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-[var(--text-sm)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+              className={navButtonClass(currentView, 'settings')}
             >
               <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
                 <circle
@@ -151,7 +163,7 @@ export function Sidebar() {
             </button>
             <button
               onClick={() => navigate({ view: 'marketplace' })}
-              className="flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-[var(--text-sm)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+              className={navButtonClass(currentView, 'marketplace')}
             >
               <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
                 <rect

@@ -1,11 +1,11 @@
-import type { EventEmitter } from 'events'
-import type { InboxRepository } from '../db/repositories/inbox.repository'
-import type { SecretsRepository } from '../db/repositories/secrets.repository'
+import { EventEmitter } from 'events'
+import { InboxRepository } from '../db/repositories/inbox.repository'
+import type { SecretsBridge } from '../ai/secrets-bridge'
 import type { HostFunctions } from './isolate-sandbox'
 
 export interface PluginApiDeps {
   inboxRepo: InboxRepository
-  secretsRepo: SecretsRepository
+  secretsBridge: SecretsBridge
   eventBus: EventEmitter
   aiRegistry?: {
     getDefault(): { [op: string]: (params: unknown) => Promise<unknown> } | null
@@ -26,7 +26,7 @@ function toPriorityNumber(value: unknown): number | undefined {
 }
 
 export function createHostFunctions(deps: PluginApiDeps): HostFunctions {
-  const { inboxRepo, secretsRepo, eventBus } = deps
+  const { inboxRepo, secretsBridge, eventBus } = deps
 
   return {
     async fetch(_pluginId: string, url: string, options: unknown): Promise<unknown> {
@@ -45,10 +45,7 @@ export function createHostFunctions(deps: PluginApiDeps): HostFunctions {
     },
 
     async getSecret(pluginId: string, key: string): Promise<string | null> {
-      // Namespaced: plugin:{pluginId}:{key}
-      const fullKey = `plugin:${pluginId}:${key}`
-      const secret = secretsRepo.getByName(fullKey)
-      return secret?.encryptedValue ?? null
+      return secretsBridge.getPluginSecret(pluginId, key)
     },
 
     async storeItems(pluginId: string, items: unknown[]): Promise<void> {

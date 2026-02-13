@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Gmail integration — sync emails, AI classification, draft replies, and inbox actions",
   "author": { "name": "DevRig", "url": "https://devrig.dev" },
+  "auth": { "type": "oauth", "providerId": "gmail" },
   "permissions": {
     "network": ["*.googleapis.com"],
     "secrets": ["gmail_oauth_token", "gmail_refresh_token"],

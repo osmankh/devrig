@@ -6,12 +6,12 @@ import type { Database } from 'better-sqlite3'
 import { PluginRepository } from '../db/repositories/plugin.repository'
 import { PluginSyncRepository } from '../db/repositories/plugin-sync.repository'
 import { InboxRepository } from '../db/repositories/inbox.repository'
-import { SecretsRepository } from '../db/repositories/secrets.repository'
 import { validateManifest } from './manifest-schema'
 import { extractPermissions, validatePermissions } from './permissions'
 import { createSandbox, type PluginSandbox, type HostFunctions } from './isolate-sandbox'
 import { PluginLoader, type PluginDescriptor } from './plugin-loader'
 import { createHostFunctions, type PluginApiDeps } from './plugin-api'
+import {SecretsBridge} from "../ai";
 
 const MAX_ACTIVE_SANDBOXES = 10
 
@@ -28,6 +28,7 @@ export interface ManagedPlugin {
 export interface PluginManagerOptions {
   db: Database
   pluginsDir?: string
+  secretsBridge?: SecretsBridge
   aiRegistry?: {
     getDefault(): { [op: string]: (params: unknown) => Promise<unknown> } | null
   }
@@ -48,10 +49,9 @@ export class PluginManager {
     this.syncRepo = new PluginSyncRepository(opts.db)
     this.inboxRepo = new InboxRepository(opts.db)
 
-    const secretsRepo = new SecretsRepository(opts.db)
     const apiDeps: PluginApiDeps = {
       inboxRepo: this.inboxRepo,
-      secretsRepo,
+      secretsBridge: opts.secretsBridge!,
       eventBus: this.eventBus,
       aiRegistry: opts.aiRegistry
     }

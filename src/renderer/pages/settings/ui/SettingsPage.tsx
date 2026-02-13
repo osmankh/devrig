@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Check } from 'lucide-react'
 import { toast } from 'sonner'
-import { Tabs, TabsList, TabsTrigger, TabsContent, Separator, Button, Input, Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Badge } from '@shared/ui'
+import { Tabs, TabsList, TabsTrigger, TabsContent, Separator, Button, Input, Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Badge, Switch } from '@shared/ui'
 import { useUIStore } from '@app/stores/ui-store'
 import { useShortcutStore, formatShortcut } from '@features/keyboard-shortcuts'
+import { PluginPreferencesPanel } from '@features/plugin-preferences'
+import { OAuthConnectButton } from '@features/plugin-onboarding/ui/OAuthConnectButton'
+import { oauthStatus, oauthDisconnect, oauthSupports } from '@features/plugin-onboarding/lib/oauth-ipc'
 import { usePluginStore } from '@entities/plugin'
 import { ipcInvoke } from '@shared/lib/ipc'
 
@@ -26,12 +29,12 @@ export function SettingsPage() {
           className="flex h-full"
         >
           <TabsList className="flex h-full w-48 shrink-0 flex-col items-stretch gap-0.5 rounded-none border-r border-[var(--color-border-subtle)] bg-transparent p-3">
-            <SettingsTab value="general">General</SettingsTab>
-            <SettingsTab value="ai">AI Models</SettingsTab>
-            <SettingsTab value="plugins">Plugins</SettingsTab>
-            <SettingsTab value="connections">Connections</SettingsTab>
-            <SettingsTab value="shortcuts">Shortcuts</SettingsTab>
-            <SettingsTab value="about">About</SettingsTab>
+            <SettingsTabTrigger value="general">General</SettingsTabTrigger>
+            <SettingsTabTrigger value="ai">AI Models</SettingsTabTrigger>
+            <SettingsTabTrigger value="plugins">Plugins</SettingsTabTrigger>
+            <SettingsTabTrigger value="connections">Connections</SettingsTabTrigger>
+            <SettingsTabTrigger value="shortcuts">Shortcuts</SettingsTabTrigger>
+            <SettingsTabTrigger value="about">About</SettingsTabTrigger>
           </TabsList>
 
           <div className="flex-1 overflow-y-auto p-6">
@@ -60,7 +63,7 @@ export function SettingsPage() {
   )
 }
 
-function SettingsTab({
+function SettingsTabTrigger({
   value,
   children
 }: {
@@ -156,17 +159,104 @@ function AIModelSettings() {
   const [providers, setProviders] = useState<
     Array<{ id: string; name: string; models: string[]; isDefault: boolean }>
   >([])
+  const [apiKey, setApiKey] = useState('')
+  const [hasKey, setHasKey] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
 
   useEffect(() => {
     ipcInvoke<typeof providers>('ai:getProviders').then(setProviders).catch(() => {})
+    ipcInvoke<boolean>('ai:hasApiKey', 'claude').then(setHasKey).catch(() => {})
   }, [])
+
+  const handleSaveKey = async () => {
+    if (!apiKey.trim()) return
+    setSaving(true)
+    try {
+      await ipcInvoke('ai:setApiKey', 'claude', apiKey.trim())
+      setHasKey(true)
+      setApiKey('')
+      toast.success('API key saved')
+    } catch {
+      toast.error('Failed to save API key')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTestConnection = async () => {
+    setTesting(true)
+    try {
+      const result = await ipcInvoke<{ success: boolean; error?: string }>('ai:testConnection', 'claude')
+      if (result.success) {
+        toast.success('Connection successful', { description: 'Claude API is working correctly.' })
+      } else {
+        toast.error('Connection failed', { description: result.error ?? 'Unknown error' })
+      }
+    } catch {
+      toast.error('Connection test failed')
+    } finally {
+      setTesting(false)
+    }
+  }
 
   return (
     <div className="max-w-lg">
+      <SectionTitle>Claude API Key</SectionTitle>
+      <div className="rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-[var(--text-sm)] font-medium text-[var(--color-text-primary)]">
+              Anthropic Claude
+            </p>
+            <p className="text-[var(--text-xs)] text-[var(--color-text-tertiary)]">
+              Powers classification, summarization, and drafting
+            </p>
+          </div>
+          {hasKey ? (
+            <Badge className="bg-[var(--color-success)]/15 text-[var(--color-success)] border-0">
+              Configured
+            </Badge>
+          ) : (
+            <Badge className="bg-[var(--color-danger)]/15 text-[var(--color-danger)] border-0">
+              Not configured
+            </Badge>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            type="password"
+            placeholder={hasKey ? 'Enter new key to replace...' : 'sk-ant-...'}
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="h-8 flex-1 text-[var(--text-xs)]"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!apiKey.trim() || saving}
+            onClick={handleSaveKey}
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+        {hasKey && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="mt-2 text-[var(--text-xs)]"
+            disabled={testing}
+            onClick={handleTestConnection}
+          >
+            {testing ? 'Testing...' : 'Test Connection'}
+          </Button>
+        )}
+      </div>
+
       <SectionTitle>AI Providers</SectionTitle>
       {providers.length === 0 ? (
         <p className="text-[var(--text-sm)] text-[var(--color-text-tertiary)]">
-          No AI providers configured. Install a provider plugin to get started.
+          No AI providers configured. Add your Claude API key above to get started.
         </p>
       ) : (
         providers.map((p) => (
@@ -258,13 +348,15 @@ function ConnectionSettings() {
   const plugins = usePluginStore((s) => s.plugins)
   const syncStates = usePluginStore((s) => s.syncStates)
   const loadPlugins = usePluginStore((s) => s.loadPlugins)
-  const configurePlugin = usePluginStore((s) => s.configurePlugin)
   const triggerSync = usePluginStore((s) => s.triggerSync)
   const loadSyncState = usePluginStore((s) => s.loadSyncState)
 
-  const [apiKeys, setApiKeys] = useState<Record<string, string>>({})
-  const [savingId, setSavingId] = useState<string | null>(null)
+  const [secretValues, setSecretValues] = useState<Record<string, string>>({})
+  const [secretStatus, setSecretStatus] = useState<Record<string, boolean>>({})
+  const [savingKey, setSavingKey] = useState<string | null>(null)
   const [syncingId, setSyncingId] = useState<string | null>(null)
+  const [expandedPrefs, setExpandedPrefs] = useState<string | null>(null)
+  const [oauthStatuses, setOauthStatuses] = useState<Record<string, { connected: boolean; supportsOAuth: boolean }>>({})
 
   useEffect(() => {
     loadPlugins()
@@ -272,10 +364,27 @@ function ConnectionSettings() {
 
   const pluginList = Object.values(plugins)
 
-  // Load sync states for all plugins
+  // Load sync states, secret status, and OAuth status for all plugins
   useEffect(() => {
     for (const p of pluginList) {
       loadSyncState(p.id)
+      if (p.requiredSecrets) {
+        for (const key of p.requiredSecrets) {
+          ipcInvoke<boolean>('plugin:hasSecret', p.id, key)
+            .then((has) => setSecretStatus((prev) => ({ ...prev, [`${p.id}:${key}`]: has })))
+            .catch(() => {})
+        }
+      }
+      // Check OAuth support and status
+      Promise.all([
+        oauthSupports(p.id).catch(() => false),
+        oauthStatus(p.id).catch(() => ({ connected: false })),
+      ]).then(([supports, status]) => {
+        setOauthStatuses((prev) => ({
+          ...prev,
+          [p.id]: { supportsOAuth: supports, connected: status.connected },
+        }))
+      })
     }
   }, [pluginList.length, loadSyncState])
 
@@ -284,7 +393,6 @@ function ConnectionSettings() {
       const states = Object.entries(syncStates)
         .filter(([key]) => key.startsWith(`${pluginId}:`))
         .map(([, state]) => state)
-
       if (states.length === 0) return 'not_configured'
       if (states.some((s) => s.syncStatus === 'error')) return 'error'
       if (states.some((s) => s.syncStatus === 'syncing')) return 'syncing'
@@ -301,26 +409,37 @@ function ConnectionSettings() {
         .map(([, state]) => state)
         .filter((s) => s.lastSyncAt)
         .sort((a, b) => new Date(b.lastSyncAt!).getTime() - new Date(a.lastSyncAt!).getTime())
-
       if (states.length === 0) return null
-      const date = new Date(states[0].lastSyncAt!)
-      return date.toLocaleString()
+      return new Date(states[0].lastSyncAt!).toLocaleString()
     },
     [syncStates],
   )
 
-  const handleSaveApiKey = async (pluginId: string) => {
-    const key = apiKeys[pluginId]
-    if (!key?.trim()) return
-    setSavingId(pluginId)
+  const humanizeSecretKey = (key: string): string => {
+    const map: Record<string, string> = {
+      gmail_oauth_token: 'Gmail OAuth Token',
+      github_token: 'GitHub Personal Access Token',
+      linear_api_key: 'Linear API Key',
+      apiKey: 'API Key',
+    }
+    if (map[key]) return map[key]
+    return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  }
+
+  const handleSaveSecret = async (pluginId: string, secretKey: string) => {
+    const compositeKey = `${pluginId}:${secretKey}`
+    const value = secretValues[compositeKey]
+    if (!value?.trim()) return
+    setSavingKey(compositeKey)
     try {
-      await configurePlugin(pluginId, { apiKey: key.trim() })
-      setApiKeys((prev) => ({ ...prev, [pluginId]: '' }))
-      toast.success('API key saved', { description: 'Connection configured securely.' })
+      await ipcInvoke('plugin:setSecret', pluginId, secretKey, value.trim())
+      setSecretStatus((prev) => ({ ...prev, [compositeKey]: true }))
+      setSecretValues((prev) => ({ ...prev, [compositeKey]: '' }))
+      toast.success('Credential saved', { description: `${humanizeSecretKey(secretKey)} stored securely.` })
     } catch {
-      toast.error('Failed to save API key')
+      toast.error('Failed to save credential')
     } finally {
-      setSavingId(null)
+      setSavingKey(null)
     }
   }
 
@@ -353,7 +472,7 @@ function ConnectionSettings() {
     <div className="max-w-lg">
       <SectionTitle>Service Connections</SectionTitle>
       <p className="mb-4 text-[var(--text-sm)] text-[var(--color-text-tertiary)]">
-        Manage API keys and sync status for your installed plugins. Keys are stored securely using system keychain.
+        Manage credentials and sync status for your installed plugins. Secrets are stored securely using system keychain.
       </p>
 
       {pluginList.length === 0 ? (
@@ -367,8 +486,8 @@ function ConnectionSettings() {
           {pluginList.map((plugin) => {
             const status = getPluginSyncStatus(plugin.id)
             const lastSync = getLastSyncTime(plugin.id)
-            const isSaving = savingId === plugin.id
             const isSyncing = syncingId === plugin.id
+            const secrets = plugin.requiredSecrets ?? []
 
             return (
               <div
@@ -399,32 +518,130 @@ function ConnectionSettings() {
                   </Button>
                 </div>
 
-                {plugin.enabled && (
-                  <div className="mt-3 flex gap-2">
-                    <Input
-                      type="password"
-                      placeholder="Enter API key..."
-                      value={apiKeys[plugin.id] ?? ''}
-                      onChange={(e) =>
-                        setApiKeys((prev) => ({ ...prev, [plugin.id]: e.target.value }))
-                      }
-                      className="h-8 flex-1 text-[var(--text-xs)]"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!apiKeys[plugin.id]?.trim() || isSaving}
-                      onClick={() => handleSaveApiKey(plugin.id)}
-                    >
-                      {isSaving ? 'Saving...' : 'Save'}
-                    </Button>
+                {/* OAuth section */}
+                {plugin.enabled && plugin.authType === 'oauth' && oauthStatuses[plugin.id]?.supportsOAuth && (
+                  <div className="mt-3">
+                    {oauthStatuses[plugin.id]?.connected ? (
+                      <div className="flex items-center justify-between">
+                        <Badge className="bg-[var(--color-success)]/15 text-[var(--color-success)] border-0">
+                          Connected via OAuth
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-[var(--text-xs)] text-[var(--color-danger)]"
+                          onClick={async () => {
+                            try {
+                              await oauthDisconnect(plugin.id)
+                              setOauthStatuses((prev) => ({
+                                ...prev,
+                                [plugin.id]: { ...prev[plugin.id], connected: false },
+                              }))
+                              toast.success('Disconnected')
+                            } catch {
+                              toast.error('Failed to disconnect')
+                            }
+                          }}
+                        >
+                          Disconnect
+                        </Button>
+                      </div>
+                    ) : (
+                      <OAuthConnectButton
+                        pluginId={plugin.id}
+                        pluginName={plugin.name}
+                        onConnected={() => {
+                          setOauthStatuses((prev) => ({
+                            ...prev,
+                            [plugin.id]: { ...prev[plugin.id], connected: true },
+                          }))
+                        }}
+                      />
+                    )}
                   </div>
+                )}
+
+                {plugin.enabled && plugin.authType === 'oauth' && !oauthStatuses[plugin.id]?.supportsOAuth && (
+                  <p className="mt-2 text-[var(--text-xs)] text-[var(--color-text-tertiary)]">
+                    OAuth not configured — set environment variables.
+                  </p>
+                )}
+
+                {/* Manual secrets (for api_key or fallback) */}
+                {plugin.enabled && plugin.authType !== 'oauth' && secrets.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {secrets.map((secretKey) => {
+                      const compositeKey = `${plugin.id}:${secretKey}`
+                      const isConfigured = secretStatus[compositeKey] ?? false
+                      const isSaving = savingKey === compositeKey
+                      return (
+                        <div key={secretKey}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Label className="text-[var(--text-xs)] text-[var(--color-text-secondary)]">
+                              {humanizeSecretKey(secretKey)}
+                            </Label>
+                            {isConfigured ? (
+                              <Badge className="bg-[var(--color-success)]/15 text-[var(--color-success)] border-0 text-[10px] px-1.5 py-0">
+                                Saved
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-[var(--color-warning)]/15 text-[var(--color-warning)] border-0 text-[10px] px-1.5 py-0">
+                                Required
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Input
+                              type="password"
+                              placeholder={isConfigured ? 'Enter new value to replace...' : `Enter ${humanizeSecretKey(secretKey).toLowerCase()}...`}
+                              value={secretValues[compositeKey] ?? ''}
+                              onChange={(e) =>
+                                setSecretValues((prev) => ({ ...prev, [compositeKey]: e.target.value }))
+                              }
+                              className="h-8 flex-1 text-[var(--text-xs)]"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!secretValues[compositeKey]?.trim() || isSaving}
+                              onClick={() => handleSaveSecret(plugin.id, secretKey)}
+                            >
+                              {isSaving ? 'Saving...' : 'Save'}
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {plugin.enabled && plugin.authType !== 'oauth' && secrets.length === 0 && (
+                  <p className="mt-2 text-[var(--text-xs)] text-[var(--color-text-quaternary)]">
+                    This plugin doesn't require any credentials.
+                  </p>
                 )}
 
                 {!plugin.enabled && (
                   <p className="mt-2 text-[var(--text-xs)] text-[var(--color-text-quaternary)]">
                     Enable this plugin in the Plugins tab to configure its connection.
                   </p>
+                )}
+
+                {/* Preferences toggle */}
+                {plugin.enabled && (
+                  <div className="mt-3 border-t border-[var(--color-border-subtle)] pt-3">
+                    <button
+                      className="text-[var(--text-xs)] text-[var(--color-accent-primary)] hover:underline"
+                      onClick={() => setExpandedPrefs(expandedPrefs === plugin.id ? null : plugin.id)}
+                    >
+                      {expandedPrefs === plugin.id ? 'Hide Preferences' : 'Preferences'}
+                    </button>
+                    {expandedPrefs === plugin.id && (
+                      <div className="mt-2">
+                        <PluginPreferencesPanel pluginId={plugin.id} />
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )
@@ -436,7 +653,8 @@ function ConnectionSettings() {
 }
 
 function ShortcutSettings() {
-  const shortcuts = useShortcutStore((s) => s.getAll())
+  const shortcutMap = useShortcutStore((s) => s.shortcuts)
+  const shortcuts = Array.from(shortcutMap.values())
 
   const categories = Array.from(new Set(shortcuts.map((s) => s.category)))
 

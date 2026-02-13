@@ -43,3 +43,4 @@ export {
   ContextMenuSeparator,
   ContextMenuGroup
 } from './context-menu'
+export { Switch } from './switch'

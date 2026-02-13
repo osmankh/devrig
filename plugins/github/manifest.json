@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "GitHub integration — sync PRs and issues, AI code review, and repository actions",
   "author": { "name": "DevRig", "url": "https://devrig.dev" },
+  "auth": { "type": "oauth", "providerId": "github" },
   "permissions": {
     "network": ["api.github.com"],
     "secrets": ["github_token"],

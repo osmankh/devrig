@@ -63,3 +63,19 @@ export function offSyncComplete(
 ): void {
   ipcOff('plugin:sync-complete', callback as (...args: unknown[]) => void)
 }
+
+export async function setPluginSecret(pluginId: string, key: string, value: string): Promise<void> {
+  return ipcInvoke<void>('plugin:setSecret', pluginId, key, value)
+}
+
+export async function hasPluginSecret(pluginId: string, key: string): Promise<boolean> {
+  return ipcInvoke<boolean>('plugin:hasSecret', pluginId, key)
+}
+
+export async function getPluginSettings(pluginId: string): Promise<Record<string, string>> {
+  return ipcInvoke<Record<string, string>>('plugin:getSettings', pluginId)
+}
+
+export async function setPluginSetting(pluginId: string, key: string, value: string): Promise<void> {
+  return ipcInvoke<void>('plugin:setSetting', pluginId, key, value)
+}

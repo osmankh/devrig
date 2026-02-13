@@ -1,7 +1,9 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { usePluginStore, type Plugin } from '@entities/plugin'
 import { Badge, Button } from '@shared/ui'
 import { Download, Power } from 'lucide-react'
+import { toast } from 'sonner'
+import { ipcInvoke } from '@shared/lib/ipc'
 
 function PluginCard({ plugin }: { plugin: Plugin }) {
   const enablePlugin = usePluginStore((s) => s.enablePlugin)
@@ -50,6 +52,25 @@ export function MarketplacePage() {
   const plugins = usePluginStore((s) => s.plugins)
   const isLoading = usePluginStore((s) => s.isLoading)
   const loadPlugins = usePluginStore((s) => s.loadPlugins)
+  const installPlugin = usePluginStore((s) => s.installPlugin)
+  const [installing, setInstalling] = useState(false)
+
+  const handleInstallFromFile = useCallback(async () => {
+    try {
+      const result = await ipcInvoke<{ canceled: boolean; filePaths: string[] }>(
+        'system:showOpenDialog',
+        { title: 'Select plugin directory', properties: ['openDirectory'] }
+      )
+      if (result.canceled || result.filePaths.length === 0) return
+      setInstalling(true)
+      await installPlugin(result.filePaths[0])
+      toast.success('Plugin installed successfully')
+    } catch (err) {
+      toast.error(`Failed to install plugin: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setInstalling(false)
+    }
+  }, [installPlugin])
 
   useEffect(() => {
     loadPlugins()
@@ -63,9 +84,15 @@ export function MarketplacePage() {
         <h1 className="text-[var(--text-lg)] font-semibold text-[var(--color-text-primary)]">
           Plugin Marketplace
         </h1>
-        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          disabled={installing}
+          onClick={handleInstallFromFile}
+        >
           <Download className="h-3.5 w-3.5" />
-          Install from file
+          {installing ? 'Installing...' : 'Install from file'}
         </Button>
       </div>
       <div className="flex-1 overflow-auto px-6 py-4">

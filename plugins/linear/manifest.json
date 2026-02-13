@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Linear integration — sync issues, AI ticket planning, complexity estimation, and project actions",
   "author": { "name": "DevRig", "url": "https://devrig.dev" },
+  "auth": { "type": "oauth", "providerId": "linear" },
   "permissions": {
     "network": ["api.linear.app"],
     "secrets": ["linear_api_key"],
