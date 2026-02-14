@@ -55,6 +55,7 @@ const INVOKE_CHANNELS = [
   // Plugin
   'plugin:list',
   'plugin:get',
+  'plugin:discoverAvailable',
   'plugin:install',
   'plugin:uninstall',
   'plugin:enable',

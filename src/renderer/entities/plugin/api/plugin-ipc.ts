@@ -5,6 +5,27 @@ export async function listPlugins(): Promise<Plugin[]> {
   return ipcInvoke<Plugin[]>('plugin:list')
 }
 
+export async function discoverAvailablePlugins(): Promise<AvailablePlugin[]> {
+  return ipcInvoke<AvailablePlugin[]>('plugin:discoverAvailable')
+}
+
+export interface AvailablePlugin {
+  id: string
+  name: string
+  version: string
+  description: string
+  icon?: string
+  author: { name: string; url?: string }
+  authType?: string
+  installed: boolean
+  enabled: boolean
+  capabilities: {
+    dataSources: string[]
+    actions: string[]
+    aiPipelines: string[]
+  }
+}
+
 export async function getPlugin(id: string): Promise<Plugin> {
   return ipcInvoke<Plugin>('plugin:get', id)
 }

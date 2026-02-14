@@ -80,6 +80,103 @@ export function registerPluginHandlers(repos: PluginRepos, services: PluginServi
     return ok(plugins.map(toRendererPlugin))
   })
 
+  secureHandle('plugin:discoverAvailable', () => {
+    try {
+      const managed = services.pluginManager.listPlugins()
+      const installedIds = new Set(managed.map((m) => m.descriptor.id))
+
+      // Also scan the bundled plugins/ directory at project root
+      const { join } = require('path') as typeof import('path')
+      const { existsSync, readdirSync, readFileSync, statSync } = require('fs') as typeof import('fs')
+      const { app } = require('electron') as typeof import('electron')
+
+      // Bundled plugins dir: next to the app (in dev: project root; in prod: resources)
+      const bundledDirs = [
+        join(app.getAppPath(), 'plugins'),
+        join(app.getAppPath(), '..', 'plugins'),
+        join(process.cwd(), 'plugins')
+      ]
+
+      interface AvailablePlugin {
+        id: string
+        name: string
+        version: string
+        description: string
+        icon?: string
+        author: { name: string; url?: string }
+        authType?: string
+        installed: boolean
+        enabled: boolean
+        capabilities: {
+          dataSources: string[]
+          actions: string[]
+          aiPipelines: string[]
+        }
+      }
+
+      const seen = new Set<string>()
+      const available: AvailablePlugin[] = []
+
+      // Add installed plugins
+      for (const m of managed) {
+        const manifest = m.descriptor.manifest
+        seen.add(manifest.id)
+        available.push({
+          id: manifest.id,
+          name: manifest.name,
+          version: manifest.version,
+          description: manifest.description,
+          icon: manifest.icon,
+          author: manifest.author,
+          authType: manifest.auth?.type,
+          installed: true,
+          enabled: m.status !== 'disabled',
+          capabilities: {
+            dataSources: manifest.capabilities?.dataSources?.map((d) => d.id) ?? [],
+            actions: manifest.capabilities?.actions?.map((a) => a.id) ?? [],
+            aiPipelines: manifest.capabilities?.aiPipelines?.map((p) => p.id) ?? []
+          }
+        })
+      }
+
+      // Scan bundled dirs for not-yet-installed plugins
+      for (const dir of bundledDirs) {
+        if (!existsSync(dir)) continue
+        for (const entry of readdirSync(dir)) {
+          const pluginDir = join(dir, entry)
+          if (!statSync(pluginDir).isDirectory()) continue
+          const manifestPath = join(pluginDir, 'manifest.json')
+          if (!existsSync(manifestPath)) continue
+          try {
+            const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'))
+            if (seen.has(manifest.id)) continue
+            seen.add(manifest.id)
+            available.push({
+              id: manifest.id,
+              name: manifest.name,
+              version: manifest.version,
+              description: manifest.description ?? '',
+              icon: manifest.icon,
+              author: manifest.author ?? { name: 'Unknown' },
+              authType: manifest.auth?.type,
+              installed: false,
+              enabled: false,
+              capabilities: {
+                dataSources: manifest.capabilities?.dataSources?.map((d: { id: string }) => d.id) ?? [],
+                actions: manifest.capabilities?.actions?.map((a: { id: string }) => a.id) ?? [],
+                aiPipelines: manifest.capabilities?.aiPipelines?.map((p: { id: string }) => p.id) ?? []
+              }
+            })
+          } catch { /* skip malformed manifest */ }
+        }
+      }
+
+      return ok(available)
+    } catch (error) {
+      return err(error instanceof Error ? error.message : 'Discovery failed', 'DISCOVERY_FAILED')
+    }
+  })
+
   secureHandle('plugin:get', (_e, id: unknown) => {
     const parsed = z.string().safeParse(id)
     if (!parsed.success) return err('Invalid plugin id', 'VALIDATION')
