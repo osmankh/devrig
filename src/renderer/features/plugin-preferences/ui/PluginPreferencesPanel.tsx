@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Label, Switch } from '@shared/ui'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Label, Switch, Input } from '@shared/ui'
+import { usePluginStore } from '@entities/plugin'
+import type { PluginPreference } from '@entities/plugin'
 import { ipcInvoke } from '@shared/lib/ipc'
 
 interface PluginPreferencesPanelProps {
@@ -7,6 +9,8 @@ interface PluginPreferencesPanelProps {
 }
 
 export function PluginPreferencesPanel({ pluginId }: PluginPreferencesPanelProps) {
+  const plugin = usePluginStore((s) => s.plugins[pluginId])
+  const preferences = plugin?.preferences ?? []
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
@@ -27,69 +31,87 @@ export function PluginPreferencesPanel({ pluginId }: PluginPreferencesPanelProps
     return <p className="text-[var(--text-xs)] text-[var(--color-text-tertiary)]">Loading...</p>
   }
 
+  if (preferences.length === 0) {
+    return <p className="text-[var(--text-xs)] text-[var(--color-text-tertiary)]">No preferences available for this plugin.</p>
+  }
+
+  const getValue = (pref: PluginPreference): string => {
+    return settings[pref.id] ?? String(pref.default ?? '')
+  }
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <Label className="text-[var(--text-xs)] text-[var(--color-text-primary)]">Auto-classify</Label>
-          <p className="text-[var(--text-xs)] text-[var(--color-text-tertiary)]">
-            Automatically classify new items after sync
-          </p>
-        </div>
-        <Switch
-          checked={settings.auto_classify !== 'false'}
-          onCheckedChange={(checked) => updateSetting('auto_classify', String(checked))}
-        />
-      </div>
-
-      <div className="flex items-center justify-between">
-        <Label className="text-[var(--text-xs)] text-[var(--color-text-primary)]">Sync interval</Label>
-        <Select
-          value={settings.sync_interval_ms ?? '300000'}
-          onValueChange={(v) => updateSetting('sync_interval_ms', v)}
-        >
-          <SelectTrigger className="w-28 h-7 text-[var(--text-xs)]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="60000">1 min</SelectItem>
-            <SelectItem value="300000">5 min</SelectItem>
-            <SelectItem value="900000">15 min</SelectItem>
-            <SelectItem value="3600000">1 hour</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <Label className="text-[var(--text-xs)] text-[var(--color-text-primary)]">Draft tone</Label>
-        <Select
-          value={settings.draft_tone ?? 'professional'}
-          onValueChange={(v) => updateSetting('draft_tone', v)}
-        >
-          <SelectTrigger className="w-28 h-7 text-[var(--text-xs)]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="professional">Professional</SelectItem>
-            <SelectItem value="casual">Casual</SelectItem>
-            <SelectItem value="concise">Concise</SelectItem>
-            <SelectItem value="detailed">Detailed</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div>
-          <Label className="text-[var(--text-xs)] text-[var(--color-text-primary)]">Auto-archive noise</Label>
-          <p className="text-[var(--text-xs)] text-[var(--color-text-tertiary)]">
-            Automatically archive items classified as noise
-          </p>
-        </div>
-        <Switch
-          checked={settings.auto_archive_noise === 'true'}
-          onCheckedChange={(checked) => updateSetting('auto_archive_noise', String(checked))}
-        />
-      </div>
+      {preferences.map((pref) => {
+        switch (pref.type) {
+          case 'toggle':
+            return (
+              <div key={pref.id} className="flex items-center justify-between">
+                <div>
+                  <Label className="text-[var(--text-xs)] text-[var(--color-text-primary)]">{pref.label}</Label>
+                  {pref.description && (
+                    <p className="text-[var(--text-xs)] text-[var(--color-text-tertiary)]">{pref.description}</p>
+                  )}
+                </div>
+                <Switch
+                  checked={getValue(pref) !== 'false'}
+                  onCheckedChange={(checked) => updateSetting(pref.id, String(checked))}
+                />
+              </div>
+            )
+          case 'select':
+            return (
+              <div key={pref.id} className="flex items-center justify-between">
+                <div>
+                  <Label className="text-[var(--text-xs)] text-[var(--color-text-primary)]">{pref.label}</Label>
+                  {pref.description && (
+                    <p className="text-[var(--text-xs)] text-[var(--color-text-tertiary)]">{pref.description}</p>
+                  )}
+                </div>
+                <Select value={getValue(pref)} onValueChange={(v) => updateSetting(pref.id, v)}>
+                  <SelectTrigger className="w-32 h-7 text-[var(--text-xs)]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(pref.options ?? []).map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )
+          case 'text':
+            return (
+              <div key={pref.id}>
+                <Label className="text-[var(--text-xs)] text-[var(--color-text-primary)]">{pref.label}</Label>
+                {pref.description && (
+                  <p className="mb-1 text-[var(--text-xs)] text-[var(--color-text-tertiary)]">{pref.description}</p>
+                )}
+                <Input
+                  value={getValue(pref)}
+                  onChange={(e) => updateSetting(pref.id, e.target.value)}
+                  className="h-7 text-[var(--text-xs)]"
+                />
+              </div>
+            )
+          case 'number':
+            return (
+              <div key={pref.id}>
+                <Label className="text-[var(--text-xs)] text-[var(--color-text-primary)]">{pref.label}</Label>
+                {pref.description && (
+                  <p className="mb-1 text-[var(--text-xs)] text-[var(--color-text-tertiary)]">{pref.description}</p>
+                )}
+                <Input
+                  type="number"
+                  value={getValue(pref)}
+                  onChange={(e) => updateSetting(pref.id, e.target.value)}
+                  className="h-7 w-24 text-[var(--text-xs)]"
+                />
+              </div>
+            )
+          default:
+            return null
+        }
+      })}
     </div>
   )
 }

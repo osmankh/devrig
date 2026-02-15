@@ -8,6 +8,15 @@ export interface PluginCapabilities {
   flowNodes?: string[]
 }
 
+export interface PluginPreference {
+  id: string
+  label: string
+  type: 'toggle' | 'select' | 'text' | 'number'
+  description?: string
+  default?: string | number | boolean
+  options?: Array<{ label: string; value: string }>
+}
+
 export interface Plugin {
   id: ID
   name: string
@@ -20,6 +29,7 @@ export interface Plugin {
   capabilities: PluginCapabilities
   requiredSecrets?: string[]
   authType?: 'oauth' | 'api_key' | 'none'
+  preferences?: PluginPreference[]
 }
 
 export interface PluginSyncState {

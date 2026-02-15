@@ -10,6 +10,47 @@
     "secrets": ["github_token"],
     "ai": true
   },
+  "preferences": [
+    {
+      "id": "sync_interval_ms",
+      "label": "Sync Interval",
+      "type": "select",
+      "description": "How often to sync from GitHub",
+      "default": "300000",
+      "options": [
+        { "label": "1 minute", "value": "60000" },
+        { "label": "5 minutes", "value": "300000" },
+        { "label": "15 minutes", "value": "900000" },
+        { "label": "1 hour", "value": "3600000" }
+      ]
+    },
+    {
+      "id": "auto_review",
+      "label": "Auto AI code review",
+      "type": "toggle",
+      "description": "Automatically run AI code review on new PRs",
+      "default": true
+    },
+    {
+      "id": "review_detail_level",
+      "label": "Review detail level",
+      "type": "select",
+      "description": "How thorough AI code reviews should be",
+      "default": "standard",
+      "options": [
+        { "label": "Brief", "value": "brief" },
+        { "label": "Standard", "value": "standard" },
+        { "label": "Thorough", "value": "thorough" }
+      ]
+    },
+    {
+      "id": "sync_issues",
+      "label": "Sync assigned issues",
+      "type": "toggle",
+      "description": "Include assigned issues in sync",
+      "default": true
+    }
+  ],
   "capabilities": {
     "dataSources": [
       {

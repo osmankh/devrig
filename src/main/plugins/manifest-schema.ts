@@ -55,6 +55,20 @@ const flowNodeSchema = z.object({
   description: z.string().max(500).optional()
 })
 
+const preferenceOptionSchema = z.object({
+  label: z.string().min(1).max(100),
+  value: z.string().min(1).max(200)
+})
+
+const preferenceSchema = z.object({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(100),
+  type: z.enum(['toggle', 'select', 'text', 'number']),
+  description: z.string().max(500).optional(),
+  default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  options: z.array(preferenceOptionSchema).optional()
+})
+
 const permissionsSchema = z.object({
   network: z.array(z.string().min(1)).min(1).optional(),
   secrets: z.array(z.string().min(1)).min(1).max(20).optional(),
@@ -86,6 +100,8 @@ export const pluginManifestSchema = z.object({
   minAppVersion: z.string().regex(semverRegex).optional(),
   maxAppVersion: z.string().regex(semverRegex).optional(),
 
+  preferences: z.array(preferenceSchema).max(20).optional(),
+
   auth: z.object({
     type: z.enum(['oauth', 'api_key', 'none']).default('api_key'),
     providerId: z.string().optional()
@@ -102,6 +118,7 @@ export type ViewCapability = z.infer<typeof viewSchema>
 export type FlowNodeCapability = z.infer<typeof flowNodeSchema>
 export type ManifestPermissions = z.infer<typeof permissionsSchema>
 export type ManifestCapabilities = z.infer<typeof capabilitiesSchema>
+export type PreferenceDefinition = z.infer<typeof preferenceSchema>
 export type PluginAuth = z.infer<typeof pluginManifestSchema>['auth']
 
 export function validateManifest(json: unknown): {

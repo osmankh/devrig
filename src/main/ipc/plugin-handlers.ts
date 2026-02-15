@@ -44,12 +44,14 @@ function toRendererPlugin(row: {
   let icon: string | undefined
   let requiredSecrets: string[] = []
   let authType: string | undefined
+  let preferences: unknown[] = []
   try {
     const parsed = JSON.parse(row.manifest)
     description = parsed.description
     icon = parsed.icon
     requiredSecrets = parsed.permissions?.secrets ?? []
     authType = parsed.auth?.type
+    preferences = parsed.preferences ?? []
     const caps = parsed.capabilities ?? {}
     capabilities = {
       dataSources: caps.dataSources?.map((d: { id: string }) => d.id) ?? [],
@@ -70,7 +72,8 @@ function toRendererPlugin(row: {
     updatedAt: row.updatedAt,
     capabilities,
     requiredSecrets,
-    authType
+    authType,
+    preferences
   }
 }
 
@@ -198,16 +201,48 @@ export function registerPluginHandlers(repos: PluginRepos, services: PluginServi
     }
   })
 
-  secureHandle('plugin:uninstall', (_e, id: unknown) => {
+  secureHandle('plugin:uninstall', async (_e, id: unknown) => {
     const parsed = z.string().safeParse(id)
     if (!parsed.success) return err('Invalid plugin id', 'VALIDATION')
+    try {
+      // The renderer may send a DB cuid (from plugin:list) or a manifest id
+      // (from plugin:discoverAvailable). Try DB lookup first to determine which.
+      const dbPlugin = repos.plugin.get(parsed.data)
+      let manifestId: string
+      let dbId: string | undefined
 
-    // Clean up plugin data
-    repos.inbox.deleteByPlugin(parsed.data)
-    repos.pluginSync.deleteByPlugin(parsed.data)
-    const deleted = repos.plugin.delete(parsed.data)
-    if (!deleted) return err('Plugin not found', 'NOT_FOUND')
-    return ok(true)
+      if (dbPlugin) {
+        // Input was a DB cuid — resolve manifest id
+        dbId = parsed.data
+        try {
+          const manifest = JSON.parse(dbPlugin.manifest)
+          manifestId = manifest.id ?? parsed.data
+        } catch {
+          manifestId = parsed.data
+        }
+      } else {
+        // Input is likely a manifest id (e.g. "gmail")
+        manifestId = parsed.data
+      }
+
+      // Uninstall via PluginManager (handles sandbox, DB, files, uninstalled marker)
+      if (dbId) {
+        await services.pluginManager.uninstallByDbId(dbId)
+      } else {
+        await services.pluginManager.uninstall(manifestId)
+      }
+
+      // Clean up plugin settings (may be keyed by DB id or manifest id)
+      const allSettings = repos.settings.getAll()
+      for (const s of allSettings) {
+        if (s.key.startsWith(`plugin:${manifestId}:`) || (dbId && s.key.startsWith(`plugin:${dbId}:`))) {
+          repos.settings.delete(s.key)
+        }
+      }
+      return ok(true)
+    } catch (error) {
+      return err(error instanceof Error ? error.message : 'Uninstall failed', 'UNINSTALL_FAILED')
+    }
   })
 
   secureHandle('plugin:enable', (_e, id: unknown) => {

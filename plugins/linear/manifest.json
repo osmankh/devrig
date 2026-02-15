@@ -10,6 +10,47 @@
     "secrets": ["linear_api_key"],
     "ai": true
   },
+  "preferences": [
+    {
+      "id": "sync_interval_ms",
+      "label": "Sync Interval",
+      "type": "select",
+      "description": "How often to sync from Linear",
+      "default": "300000",
+      "options": [
+        { "label": "1 minute", "value": "60000" },
+        { "label": "5 minutes", "value": "300000" },
+        { "label": "15 minutes", "value": "900000" },
+        { "label": "1 hour", "value": "3600000" }
+      ]
+    },
+    {
+      "id": "auto_plan",
+      "label": "Auto-suggest breakdowns",
+      "type": "toggle",
+      "description": "Automatically suggest ticket breakdowns for new issues",
+      "default": false
+    },
+    {
+      "id": "estimate_method",
+      "label": "Estimation method",
+      "type": "select",
+      "description": "Method used for complexity estimation",
+      "default": "complexity",
+      "options": [
+        { "label": "Complexity 1-5", "value": "complexity" },
+        { "label": "T-Shirt (XS-XL)", "value": "tshirt" },
+        { "label": "Story Points", "value": "story-points" }
+      ]
+    },
+    {
+      "id": "sync_completed",
+      "label": "Sync completed issues",
+      "type": "toggle",
+      "description": "Include completed issues in sync",
+      "default": false
+    }
+  ],
   "capabilities": {
     "dataSources": [
       {

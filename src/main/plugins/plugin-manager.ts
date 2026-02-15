@@ -6,6 +6,7 @@ import type { Database } from 'better-sqlite3'
 import { PluginRepository } from '../db/repositories/plugin.repository'
 import { PluginSyncRepository } from '../db/repositories/plugin-sync.repository'
 import { InboxRepository } from '../db/repositories/inbox.repository'
+import { SettingsRepository } from '../db/repositories/settings.repository'
 import { validateManifest } from './manifest-schema'
 import { extractPermissions, validatePermissions } from './permissions'
 import { createSandbox, type PluginSandbox, type HostFunctions } from './isolate-sandbox'
@@ -40,6 +41,7 @@ export class PluginManager {
   private pluginRepo: PluginRepository
   private syncRepo: PluginSyncRepository
   private inboxRepo: InboxRepository
+  private settingsRepo: SettingsRepository
   private hostFunctions: HostFunctions
   private loader: PluginLoader
   private eventBus = new EventEmitter()
@@ -48,6 +50,7 @@ export class PluginManager {
     this.pluginRepo = new PluginRepository(opts.db)
     this.syncRepo = new PluginSyncRepository(opts.db)
     this.inboxRepo = new InboxRepository(opts.db)
+    this.settingsRepo = new SettingsRepository(opts.db)
 
     const apiDeps: PluginApiDeps = {
       inboxRepo: this.inboxRepo,
@@ -101,6 +104,11 @@ export class PluginManager {
         existing.descriptor.path = desc.path
         existing.descriptor.entryPoints = desc.entryPoints
       } else {
+        // Skip plugins explicitly uninstalled by the user
+        if (this.settingsRepo.get(`plugin:uninstalled:${desc.id}`)) {
+          continue
+        }
+
         // Auto-register newly discovered plugins into DB
         const dbRecord = this.pluginRepo.create({
           name: desc.name,
@@ -131,6 +139,9 @@ export class PluginManager {
     if (this.descriptors.has(desc.id)) {
       throw new Error(`Plugin "${desc.id}" is already installed`)
     }
+
+    // Clear uninstalled marker if re-installing
+    this.settingsRepo.delete(`plugin:uninstalled:${desc.id}`)
 
     const permResult = validatePermissions(desc.permissions)
     if (!permResult.valid) {
@@ -173,27 +184,65 @@ export class PluginManager {
 
   async uninstall(pluginId: string): Promise<void> {
     const managed = this.descriptors.get(pluginId)
-    if (!managed) return
 
-    // Dispose sandbox
+    // Dispose sandbox if active
     const sandbox = this.sandboxes.get(pluginId)
     if (sandbox) {
       sandbox.dispose()
       this.sandboxes.delete(pluginId)
     }
 
-    // Clean up DB data
-    this.inboxRepo.deleteByPlugin(managed.dbId)
-    this.syncRepo.deleteByPlugin(managed.dbId)
-    this.pluginRepo.delete(managed.dbId)
+    if (managed) {
+      // Clean up DB data using the DB id
+      this.inboxRepo.deleteByPlugin(managed.dbId)
+      this.syncRepo.deleteByPlugin(managed.dbId)
+      this.pluginRepo.delete(managed.dbId)
+    }
 
-    // Delete plugin files
+    // Mark as explicitly uninstalled so auto-discovery won't re-register it
+    this.settingsRepo.set(`plugin:uninstalled:${pluginId}`, 'true')
+
+    // Delete plugin files from userData
     const pluginDir = join(this.getPluginsDir(), pluginId)
     if (existsSync(pluginDir)) {
       rmSync(pluginDir, { recursive: true, force: true })
     }
 
     this.descriptors.delete(pluginId)
+  }
+
+  /**
+   * Uninstall a plugin by its DB id (cuid). Resolves to manifest id internally.
+   * Use this when the caller only has the DB id.
+   */
+  async uninstallByDbId(dbId: string): Promise<void> {
+    // Find the manifest id from our descriptors
+    for (const [manifestId, managed] of this.descriptors) {
+      if (managed.dbId === dbId) {
+        return this.uninstall(manifestId)
+      }
+    }
+
+    // Plugin not in descriptors — clean DB directly
+    this.inboxRepo.deleteByPlugin(dbId)
+    this.syncRepo.deleteByPlugin(dbId)
+
+    // Get manifest id from DB before deleting
+    const dbPlugin = this.pluginRepo.get(dbId)
+    let manifestId: string | undefined
+    if (dbPlugin) {
+      try {
+        const parsed = JSON.parse(dbPlugin.manifest)
+        manifestId = parsed.id
+      } catch { /* ignore */ }
+    }
+
+    this.pluginRepo.delete(dbId)
+
+    // Mark as uninstalled using manifest id if available
+    if (manifestId) {
+      this.settingsRepo.set(`plugin:uninstalled:${manifestId}`, 'true')
+    }
   }
 
   async enable(pluginId: string): Promise<void> {

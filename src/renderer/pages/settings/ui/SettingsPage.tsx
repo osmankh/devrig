@@ -293,10 +293,30 @@ function PluginSettings() {
   const [plugins, setPlugins] = useState<
     Array<{ id: string; name: string; version: string; enabled: number }>
   >([])
+  const uninstallPlugin = usePluginStore((s) => s.uninstallPlugin)
+  const [uninstallingId, setUninstallingId] = useState<string | null>(null)
 
-  useEffect(() => {
+  const fetchPlugins = useCallback(() => {
     ipcInvoke<typeof plugins>('plugin:list').then(setPlugins).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    fetchPlugins()
+  }, [fetchPlugins])
+
+  const handleUninstall = async (p: { id: string; name: string }) => {
+    if (!window.confirm(`Uninstall ${p.name}? This will remove all plugin data and settings.`)) return
+    setUninstallingId(p.id)
+    try {
+      await uninstallPlugin(p.id)
+      toast.success(`${p.name} uninstalled`)
+      fetchPlugins()
+    } catch {
+      toast.error(`Failed to uninstall ${p.name}`)
+    } finally {
+      setUninstallingId(null)
+    }
+  }
 
   return (
     <div className="max-w-lg">
@@ -319,24 +339,35 @@ function PluginSettings() {
                 v{p.version}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const channel = p.enabled ? 'plugin:disable' : 'plugin:enable'
-                ipcInvoke(channel, p.id).then(() => {
-                  setPlugins((prev) =>
-                    prev.map((pl) =>
-                      pl.id === p.id
-                        ? { ...pl, enabled: pl.enabled ? 0 : 1 }
-                        : pl
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const channel = p.enabled ? 'plugin:disable' : 'plugin:enable'
+                  ipcInvoke(channel, p.id).then(() => {
+                    setPlugins((prev) =>
+                      prev.map((pl) =>
+                        pl.id === p.id
+                          ? { ...pl, enabled: pl.enabled ? 0 : 1 }
+                          : pl
+                      )
                     )
-                  )
-                })
-              }}
-            >
-              {p.enabled ? 'Disable' : 'Enable'}
-            </Button>
+                  })
+                }}
+              >
+                {p.enabled ? 'Disable' : 'Enable'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[var(--color-danger)] hover:text-[var(--color-danger)]"
+                disabled={uninstallingId === p.id}
+                onClick={() => handleUninstall(p)}
+              >
+                {uninstallingId === p.id ? 'Removing...' : 'Uninstall'}
+              </Button>
+            </div>
           </div>
         ))
       )}

@@ -22,6 +22,7 @@ export function PluginHubDialog({ open, onOpenChange }: PluginHubDialogProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [installingId, setInstallingId] = useState<string | null>(null)
+  const [uninstallingId, setUninstallingId] = useState<string | null>(null)
   const [setupPlugin, setSetupPlugin] = useState<AvailablePlugin | null>(null)
 
   const loadPlugins = usePluginStore((s) => s.loadPlugins)
@@ -110,6 +111,28 @@ export function PluginHubDialog({ open, onOpenChange }: PluginHubDialogProps) {
       setInstallingId(null)
     }
   }, [storeInstall, enablePlugin])
+
+  const handleUninstall = useCallback(async (plugin: AvailablePlugin) => {
+    if (!window.confirm(`Uninstall ${plugin.name}? This will remove all plugin data and settings.`)) return
+    setUninstallingId(plugin.id)
+    try {
+      await usePluginStore.getState().uninstallPlugin(plugin.id)
+      setPlugins((prev) =>
+        prev.map((p) =>
+          p.id === plugin.id ? { ...p, installed: false, enabled: false } : p
+        )
+      )
+      setConnectionStatuses((prev) => ({
+        ...prev,
+        [plugin.id]: 'available'
+      }))
+      toast.success(`${plugin.name} uninstalled`)
+    } catch {
+      toast.error(`Failed to uninstall ${plugin.name}`)
+    } finally {
+      setUninstallingId(null)
+    }
+  }, [])
 
   const handleSetup = useCallback((plugin: AvailablePlugin) => {
     setSetupPlugin(plugin)
@@ -208,7 +231,9 @@ export function PluginHubDialog({ open, onOpenChange }: PluginHubDialogProps) {
                     searchQuery={searchQuery}
                     onInstall={handleInstall}
                     onSetup={handleSetup}
+                    onUninstall={handleUninstall}
                     installingId={installingId}
+                    uninstallingId={uninstallingId}
                   />
                 )}
               </div>

@@ -2,6 +2,7 @@ export { usePluginStore } from './model/plugin-store'
 export type {
   Plugin,
   PluginCapabilities,
+  PluginPreference,
   PluginSyncState
 } from './model/plugin.types'
 export type { AvailablePlugin } from './api/plugin-ipc'

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { Check, Download, ExternalLink, Loader2, Database, Zap, Brain } from 'lucide-react'
+import { Check, Download, ExternalLink, Loader2, Database, Zap, Brain, Trash2 } from 'lucide-react'
 import { Badge, Button } from '@shared/ui'
 import type { AvailablePlugin } from '@entities/plugin'
 
@@ -11,7 +11,9 @@ interface PluginCardProps {
   connectionStatus: ConnectionStatus
   onInstall: (plugin: AvailablePlugin) => void
   onSetup: (plugin: AvailablePlugin) => void
+  onUninstall?: (plugin: AvailablePlugin) => void
   installing?: boolean
+  uninstalling?: boolean
 }
 
 const PLUGIN_ICONS: Record<string, string> = {
@@ -67,7 +69,7 @@ function StatusBadge({ status }: { status: ConnectionStatus }) {
   }
 }
 
-export function PluginCard({ plugin, connectionStatus, onInstall, onSetup, installing }: PluginCardProps) {
+export function PluginCard({ plugin, connectionStatus, onInstall, onSetup, onUninstall, installing, uninstalling }: PluginCardProps) {
   const capCount = plugin.capabilities.dataSources.length +
     plugin.capabilities.actions.length +
     plugin.capabilities.aiPipelines.length
@@ -147,26 +149,52 @@ export function PluginCard({ plugin, connectionStatus, onInstall, onSetup, insta
           </Button>
         )}
         {connectionStatus === 'installed' && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full gap-1.5 text-xs"
-            onClick={handleAction}
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            Set up connection
-          </Button>
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 gap-1.5 text-xs"
+              onClick={handleAction}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Set up connection
+            </Button>
+            {onUninstall && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="shrink-0 text-[var(--color-text-quaternary)] hover:text-[var(--color-danger)]"
+                disabled={uninstalling}
+                onClick={() => onUninstall(plugin)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         )}
         {connectionStatus === 'connected' && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="w-full gap-1.5 text-xs text-[var(--color-success)]"
-            disabled
-          >
-            <Check className="h-3.5 w-3.5" />
-            Connected
-          </Button>
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="flex-1 gap-1.5 text-xs text-[var(--color-success)]"
+              disabled
+            >
+              <Check className="h-3.5 w-3.5" />
+              Connected
+            </Button>
+            {onUninstall && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="shrink-0 text-[var(--color-text-quaternary)] hover:text-[var(--color-danger)]"
+                disabled={uninstalling}
+                onClick={() => onUninstall(plugin)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </motion.div>

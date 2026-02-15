@@ -11,7 +11,9 @@ interface PluginGridProps {
   searchQuery: string
   onInstall: (plugin: AvailablePlugin) => void
   onSetup: (plugin: AvailablePlugin) => void
+  onUninstall?: (plugin: AvailablePlugin) => void
   installingId: string | null
+  uninstallingId?: string | null
 }
 
 export function PluginGrid({
@@ -20,7 +22,9 @@ export function PluginGrid({
   searchQuery,
   onInstall,
   onSetup,
-  installingId
+  onUninstall,
+  installingId,
+  uninstallingId
 }: PluginGridProps) {
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return plugins
@@ -62,7 +66,9 @@ export function PluginGrid({
           connectionStatus={connectionStatuses[plugin.id] ?? 'available'}
           onInstall={onInstall}
           onSetup={onSetup}
+          onUninstall={onUninstall}
           installing={installingId === plugin.id}
+          uninstalling={uninstallingId === plugin.id}
         />
       ))}
     </motion.div>
