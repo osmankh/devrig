@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3'
-import { StatementCache } from '../statement-cache'
+import { StatementCache, mapRow, mapRows } from '../statement-cache'
 import type { PluginSyncState } from '../schema'
 
 export class PluginSyncRepository {
@@ -10,29 +10,36 @@ export class PluginSyncRepository {
   }
 
   get(pluginId: string, dataSourceId: string): PluginSyncState | undefined {
-    return this.stmts
+    const row = this.stmts
       .prepare(
         'SELECT * FROM plugin_sync_state WHERE plugin_id = ? AND data_source_id = ?'
       )
-      .get(pluginId, dataSourceId) as PluginSyncState | undefined
+      .get(pluginId, dataSourceId)
+    return row ? mapRow<PluginSyncState>(row) : undefined
   }
 
   listByPlugin(pluginId: string): PluginSyncState[] {
-    return this.stmts
-      .prepare('SELECT * FROM plugin_sync_state WHERE plugin_id = ? ORDER BY data_source_id ASC')
-      .all(pluginId) as PluginSyncState[]
+    return mapRows<PluginSyncState>(
+      this.stmts
+        .prepare('SELECT * FROM plugin_sync_state WHERE plugin_id = ? ORDER BY data_source_id ASC')
+        .all(pluginId)
+    )
   }
 
   listByStatus(status: string): PluginSyncState[] {
-    return this.stmts
-      .prepare('SELECT * FROM plugin_sync_state WHERE sync_status = ?')
-      .all(status) as PluginSyncState[]
+    return mapRows<PluginSyncState>(
+      this.stmts
+        .prepare('SELECT * FROM plugin_sync_state WHERE sync_status = ?')
+        .all(status)
+    )
   }
 
   listAll(): PluginSyncState[] {
-    return this.stmts
-      .prepare('SELECT * FROM plugin_sync_state ORDER BY plugin_id, data_source_id')
-      .all() as PluginSyncState[]
+    return mapRows<PluginSyncState>(
+      this.stmts
+        .prepare('SELECT * FROM plugin_sync_state ORDER BY plugin_id, data_source_id')
+        .all()
+    )
   }
 
   create(data: {

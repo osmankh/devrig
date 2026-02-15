@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3'
 import { createId } from '@paralleldrive/cuid2'
-import { StatementCache } from '../statement-cache'
+import { StatementCache, mapRow, mapRows } from '../statement-cache'
 import type { Execution, ExecutionStep } from '../schema'
 
 export interface ExecutionWithSteps {
@@ -16,28 +16,33 @@ export class ExecutionRepository {
   }
 
   list(workflowId: string, limit = 50, offset = 0): Execution[] {
-    return this.stmts
-      .prepare(
-        'SELECT * FROM executions WHERE workflow_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-      )
-      .all(workflowId, limit, offset) as Execution[]
+    return mapRows<Execution>(
+      this.stmts
+        .prepare(
+          'SELECT * FROM executions WHERE workflow_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+        )
+        .all(workflowId, limit, offset)
+    )
   }
 
   get(id: string): Execution | undefined {
-    return this.stmts
+    const row = this.stmts
       .prepare('SELECT * FROM executions WHERE id = ?')
-      .get(id) as Execution | undefined
+      .get(id)
+    return row ? mapRow<Execution>(row) : undefined
   }
 
   getWithSteps(id: string): ExecutionWithSteps | undefined {
     const execution = this.get(id)
     if (!execution) return undefined
 
-    const steps = this.stmts
-      .prepare(
-        'SELECT * FROM execution_steps WHERE execution_id = ? ORDER BY started_at ASC'
-      )
-      .all(id) as ExecutionStep[]
+    const steps = mapRows<ExecutionStep>(
+      this.stmts
+        .prepare(
+          'SELECT * FROM execution_steps WHERE execution_id = ? ORDER BY started_at ASC'
+        )
+        .all(id)
+    )
 
     return { execution, steps }
   }
@@ -139,17 +144,18 @@ export class ExecutionRepository {
   ): ExecutionStep | undefined {
     const existing = this.stmts
       .prepare('SELECT * FROM execution_steps WHERE id = ?')
-      .get(id) as ExecutionStep | undefined
+      .get(id)
 
     if (!existing) return undefined
 
-    const status = data.status ?? existing.status
-    const input = data.input !== undefined ? data.input : existing.input
-    const output = data.output !== undefined ? data.output : existing.output
-    const error = data.error !== undefined ? data.error : existing.error
-    const startedAt = data.startedAt ?? existing.startedAt
-    const completedAt = data.completedAt ?? existing.completedAt
-    const durationMs = data.durationMs ?? existing.durationMs
+    const mapped = mapRow<ExecutionStep>(existing)
+    const status = data.status ?? mapped.status
+    const input = data.input !== undefined ? data.input : mapped.input
+    const output = data.output !== undefined ? data.output : mapped.output
+    const error = data.error !== undefined ? data.error : mapped.error
+    const startedAt = data.startedAt ?? mapped.startedAt
+    const completedAt = data.completedAt ?? mapped.completedAt
+    const durationMs = data.durationMs ?? mapped.durationMs
 
     this.stmts
       .prepare(
@@ -158,14 +164,16 @@ export class ExecutionRepository {
       )
       .run(status, input, output, error, startedAt, completedAt, durationMs, id)
 
-    return { ...existing, status, input, output, error, startedAt, completedAt, durationMs }
+    return { ...mapped, status, input, output, error, startedAt, completedAt, durationMs }
   }
 
   listSteps(executionId: string): ExecutionStep[] {
-    return this.stmts
-      .prepare(
-        'SELECT * FROM execution_steps WHERE execution_id = ? ORDER BY started_at ASC'
-      )
-      .all(executionId) as ExecutionStep[]
+    return mapRows<ExecutionStep>(
+      this.stmts
+        .prepare(
+          'SELECT * FROM execution_steps WHERE execution_id = ? ORDER BY started_at ASC'
+        )
+        .all(executionId)
+    )
   }
 }

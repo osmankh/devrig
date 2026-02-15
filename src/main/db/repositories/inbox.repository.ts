@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3'
 import { createId } from '@paralleldrive/cuid2'
-import { StatementCache } from '../statement-cache'
+import { StatementCache, mapRow, mapRows } from '../statement-cache'
 import type { InboxItem } from '../schema'
 
 export interface InboxQuery {
@@ -40,15 +40,17 @@ export class InboxRepository {
   }
 
   get(id: string): InboxItem | undefined {
-    return this.stmts
+    const row = this.stmts
       .prepare('SELECT * FROM inbox_items WHERE id = ?')
-      .get(id) as InboxItem | undefined
+      .get(id)
+    return row ? mapRow<InboxItem>(row) : undefined
   }
 
   getByExternalId(pluginId: string, externalId: string): InboxItem | undefined {
-    return this.stmts
+    const row = this.stmts
       .prepare('SELECT * FROM inbox_items WHERE plugin_id = ? AND external_id = ?')
-      .get(pluginId, externalId) as InboxItem | undefined
+      .get(pluginId, externalId)
+    return row ? mapRow<InboxItem>(row) : undefined
   }
 
   list(query: InboxQuery = {}): InboxItem[] {
@@ -91,19 +93,21 @@ export class InboxRepository {
     const sql = `SELECT * FROM inbox_items ${where} ${orderClause} LIMIT ? OFFSET ?`
     params.push(limit, offset)
 
-    return this.stmts.prepare(sql).all(...params) as InboxItem[]
+    return mapRows<InboxItem>(this.stmts.prepare(sql).all(...params))
   }
 
   search(searchText: string, limit = 50, offset = 0): InboxItem[] {
-    return this.stmts
-      .prepare(
-        `SELECT inbox_items.* FROM inbox_items
+    return mapRows<InboxItem>(
+      this.stmts
+        .prepare(
+          `SELECT inbox_items.* FROM inbox_items
          JOIN inbox_items_fts ON inbox_items.rowid = inbox_items_fts.rowid
          WHERE inbox_items_fts MATCH ?
          ORDER BY rank
          LIMIT ? OFFSET ?`
-      )
-      .all(searchText, limit, offset) as InboxItem[]
+        )
+        .all(searchText, limit, offset)
+    )
   }
 
   count(query: InboxQuery = {}): number {

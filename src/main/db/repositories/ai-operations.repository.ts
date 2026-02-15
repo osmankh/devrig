@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3'
 import { createId } from '@paralleldrive/cuid2'
-import { StatementCache } from '../statement-cache'
+import { StatementCache, mapRow, mapRows } from '../statement-cache'
 import type { AiOperation, NewAiOperation } from '../schema'
 
 export interface AiUsageSummary {
@@ -30,33 +30,40 @@ export class AiOperationsRepository {
   }
 
   get(id: string): AiOperation | undefined {
-    return this.stmts
+    const row = this.stmts
       .prepare('SELECT * FROM ai_operations WHERE id = ?')
-      .get(id) as AiOperation | undefined
+      .get(id)
+    return row ? mapRow<AiOperation>(row) : undefined
   }
 
   list(limit = 50, offset = 0): AiOperation[] {
-    return this.stmts
-      .prepare(
-        'SELECT * FROM ai_operations ORDER BY created_at DESC LIMIT ? OFFSET ?'
-      )
-      .all(limit, offset) as AiOperation[]
+    return mapRows<AiOperation>(
+      this.stmts
+        .prepare(
+          'SELECT * FROM ai_operations ORDER BY created_at DESC LIMIT ? OFFSET ?'
+        )
+        .all(limit, offset)
+    )
   }
 
   listByPlugin(pluginId: string, limit = 50, offset = 0): AiOperation[] {
-    return this.stmts
-      .prepare(
-        'SELECT * FROM ai_operations WHERE plugin_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-      )
-      .all(pluginId, limit, offset) as AiOperation[]
+    return mapRows<AiOperation>(
+      this.stmts
+        .prepare(
+          'SELECT * FROM ai_operations WHERE plugin_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+        )
+        .all(pluginId, limit, offset)
+    )
   }
 
   listByInboxItem(inboxItemId: string): AiOperation[] {
-    return this.stmts
-      .prepare(
-        'SELECT * FROM ai_operations WHERE inbox_item_id = ? ORDER BY created_at DESC'
-      )
-      .all(inboxItemId) as AiOperation[]
+    return mapRows<AiOperation>(
+      this.stmts
+        .prepare(
+          'SELECT * FROM ai_operations WHERE inbox_item_id = ? ORDER BY created_at DESC'
+        )
+        .all(inboxItemId)
+    )
   }
 
   create(data: {
@@ -336,6 +343,6 @@ export class AiOperationsRepository {
     params.push(limit, offset)
 
     const sql = `SELECT * FROM ai_operations ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    return this.stmts.prepare(sql).all(...params) as AiOperation[]
+    return mapRows<AiOperation>(this.stmts.prepare(sql).all(...params))
   }
 }

@@ -69,6 +69,7 @@
     "@typescript-eslint/eslint-plugin": "^8.55.0",
     "@typescript-eslint/parser": "^8.55.0",
     "@vitejs/plugin-react": "^4.4.0",
+    "@vitest/coverage-v8": "^4.0.18",
     "babel-plugin-react-compiler": "19.1.0-rc.3",
     "electron": "^34.5.8",
     "electron-vite": "^5.0.0",

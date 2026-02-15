@@ -9,7 +9,18 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/main/**/*.ts'],
-      exclude: ['src/main/index.ts']
+      exclude: [
+        'src/main/index.ts',
+        'src/main/**/index.ts',
+        'src/main/auth/oauth-types.ts',
+        'src/main/db/schema.ts'
+      ],
+      thresholds: {
+        statements: 80,
+        branches: 70,
+        functions: 75,
+        lines: 80
+      }
     }
   },
   resolve: {
